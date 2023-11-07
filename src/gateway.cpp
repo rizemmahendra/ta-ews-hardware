@@ -6,6 +6,11 @@ const long frequency = 433E6; // LoRa Frequency
 const int nssPin = 5;         // LoRa radio chip select
 const int resetPin = 0;       // LoRa radio reset
 const int dio0Pin = 2;        // change for your board; must be a hardware interrupt pin
+String data;
+byte localAddress = 0x02; // address this device
+byte destination = 0x01;  // address destination
+unsigned long lastSendTime = 0;
+unsigned int interval = 2000;
 // ============================================================
 
 // ===================== Buzzer Config ========================
@@ -40,6 +45,7 @@ void setupLoRA()
         while (1)
             ;
     }
+    Serial.println("LoRa init Successfull");
 }
 
 void setupWifi()
@@ -83,8 +89,8 @@ void setupFirebase()
     }
     if (auth.token.uid != "null")
     {
-        Serial.print("Connected to Firebase");
-        Serial.print(auth.token.uid.c_str());
+        Serial.print("Connected to Firebase with id: ");
+        Serial.println(auth.token.uid.c_str());
     }
     else
     {
@@ -104,23 +110,57 @@ void setup()
     setupFirebase(); // Setup and Inisialization Firebase
 }
 
+String onReceive(int packetSize)
+{
+    if (packetSize == 0)
+        return "";
+
+    byte recipient = LoRa.read();
+    byte sender = LoRa.read();
+    byte incomingLength = LoRa.read();
+    // received a packet
+    String incoming = "";
+
+    if (recipient != localAddress)
+    {
+        Serial.println("This Message is Not For Me!");
+        return "";
+    }
+    // read packet
+    while (LoRa.available())
+    {
+        incoming += (char)LoRa.read();
+    }
+
+    if (incoming.length() != incomingLength)
+    {
+        Serial.println("Message lenght does not match lenght");
+        return "";
+    }
+
+    // print RSSI of packet
+    // Serial.println((String)incoming);
+    // Serial.print("' with RSSI ");
+    // Serial.println(LoRa.packetRssi());
+    Serial.println("Received from: 0x" + String(sender, HEX));
+    Serial.println("Sent to: 0x" + String(recipient, HEX));
+    Serial.println("Message length: " + String(incomingLength));
+    Serial.println("Message: " + incoming);
+    Serial.println("RSSI: " + String(LoRa.packetRssi()));
+    Serial.println("Snr: " + String(LoRa.packetSnr()));
+    Serial.println();
+    return incoming;
+}
+
 void loop()
 {
     // try to parse packet
-    int packetSize = LoRa.parsePacket();
-    if (packetSize)
+    // onReceive(LoRa.parsePacket());
+    data = onReceive(LoRa.parsePacket());
+    // Serial.println(data.length());
+    if (Firebase.ready() && data != "")
     {
-        // received a packet
-        Serial.print("Received packet '");
-
-        // read packet
-        while (LoRa.available())
-        {
-            Serial.print((char)LoRa.read());
-        }
-
-        // print RSSI of packet
-        Serial.print("' with RSSI ");
-        Serial.println(LoRa.packetRssi());
+        Serial.printf("Set Ketinggian Air: %.2f ... %s\n", data.toFloat(), Firebase.RTDB.setFloat(&fbdo, "/jarak", data.toFloat()) ? "Ok" : fbdo.errorReason().c_str());
+        Serial.printf("Set timestamp... %s\n", Firebase.RTDB.setTimestamp(&fbdo, "/timestamp") ? "ok" : fbdo.errorReason().c_str());
     }
 }
