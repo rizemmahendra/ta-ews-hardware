@@ -7,16 +7,28 @@ const long frequency = 433E6; // LoRa Frequency
 const int nssPin = 10;        // LoRa radio chip select
 const int resetPin = 9;       // LoRa radio reset
 const int dio0Pin = 2;        // change for your board; must be a hardware interrupt pin
-String data;
+// String data;
 byte localAddress = 0x01; // address this device
 byte destination = 0x02;  // address destination
 unsigned long lastSendTime = 0;
-unsigned int interval = 2000;
+unsigned int interval = 500;
+// =================================================================
+
+// ================== ArduinoJSON Library & Config ==================
+#include <ArduinoJson.h>
 // =================================================================
 
 // ================== Ultrasonik Library & Config ==================
 const int trigPin = 4;
 const int echoPin = 5;
+// =================================================================
+
+// ================== Turbidity Library & Config ==================
+const int ldrPin = A0;
+// =================================================================
+
+// ================== Rain Gauge Library & Config ==================
+const int reedSwitchPin = 3;
 // =================================================================
 
 float ultrasonik()
@@ -30,6 +42,20 @@ float ultrasonik()
     int durasi = pulseIn(echoPin, HIGH);
     float jarak = (durasi / 2) * 0.034;
     return jarak;
+}
+
+float turbidity()
+{
+    // float value = analogRead(ldrPin);
+    static float value = 0;
+    value++;
+    return value;
+}
+
+float rainGauge()
+{
+    int value = digitalRead(reedSwitchPin);
+    return value;
 }
 
 void setupLora()
@@ -59,19 +85,24 @@ void setup()
     Serial.begin(9600);
     pinMode(trigPin, OUTPUT);
     pinMode(echoPin, INPUT);
+    pinMode(ldrPin, INPUT);
+    pinMode(reedSwitchPin, INPUT);
     setupLora();
 }
 void loop()
 {
-    float jarak = ultrasonik();
-    data = (String)jarak;
+    StaticJsonDocument<256> data;
+    data["jarak"] = ultrasonik();
+    data["kekeruhan"] = turbidity();
+    data["hujan"] = rainGauge();
+    String message;
+    serializeJson(data, message);
 
     delay(1000);
     if (millis() - lastSendTime > interval)
     {
-        // String message = (String)jarak;
-        sendMessage(data);
-        Serial.println("mengirim data : " + data);
+        sendMessage(message);
+        Serial.println("mengirim data : " + message);
         lastSendTime = millis();
     }
 }
