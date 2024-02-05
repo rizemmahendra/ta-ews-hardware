@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Firebase_ESP_Client.h>
 #include <WiFi.h>
+#include "Waktu.cpp"
 
 class Network
 {
@@ -22,6 +23,8 @@ public:
     ~Network();
     bool initializeWifi(const char *ssid, const char *password);
     void initializeFirebase(const char *api_key, const char *projectId, const char *email, const char *password, const char *id_sungai);
+    void initializeTime(long gmtOffset_sec, int daylightOffset_sec, const char *urlNTPServer);
+    void getCurrentTime(Waktu *waktu);
     void updateDataRealtimeFirebase(FirebaseJson *json, const char *updateMask);
     void updateDataHistoryFirebase(FirebaseJson *json, const char *tanggal, const char *jam);
     bool ready();

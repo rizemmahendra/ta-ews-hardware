@@ -74,6 +74,34 @@ void Network::initializeFirebase(const char *api_key, const char *projectId, con
 
 /**
  * @brief
+ * @param gmtOffset_sec
+ * @param daylightOffset_sec
+ * @param urlNTPServer
+ */
+void Network::initializeTime(long gmtOffset_sec, int daylightOffset_sec, const char *urlNTPServer)
+{
+    configTime(gmtOffset_sec, daylightOffset_sec, urlNTPServer);
+}
+
+/**
+ * @brief
+ * @param waktu
+ */
+void Network::getCurrentTime(Waktu *waktu)
+{
+    struct tm info;
+    if (!getLocalTime(&info))
+    {
+        Serial.println("Gagal Mendapatkan Waktu Sekarang");
+        return;
+    }
+    strftime(waktu->date, sizeof(waktu->date), "%Y-%m-%d", &info);
+    strftime(waktu->time, sizeof(waktu->time), "%H:%M", &info);
+    strftime(waktu->hour, sizeof(waktu->hour), "%H", &info);
+}
+
+/**
+ * @brief
  * @return Boolean, true is connection wifi and firebase ready
  */
 bool Network::ready()
