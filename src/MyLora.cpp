@@ -1,0 +1,71 @@
+#include <MyLora.h>
+
+MyLora::MyLora(const int *nssPin, const int *resetPin, const int *dio0Pin, const byte *localAddress)
+{
+    MyLora::_resetPin = *resetPin;
+    MyLora::_nssPin = *nssPin;
+    MyLora::_dio0Pin = *dio0Pin;
+    MyLora::_localAddress = *localAddress;
+}
+
+MyLora::~MyLora() {}
+
+void MyLora::initilize(const long frequency)
+{
+    LoRa.setPins(_nssPin, _resetPin, _dio0Pin);
+    if (!LoRa.begin(frequency))
+    {
+        Serial.println("Lora init failed. Check your connections");
+        while (true)
+            ;
+    }
+    Serial.println("Lora init Succeeded");
+}
+
+void MyLora::sendMessage(byte destination, String message)
+{
+    LoRa.beginPacket();
+    LoRa.write(destination);
+    LoRa.write(_localAddress);
+    LoRa.write(message.length());
+    LoRa.print(message);
+    LoRa.endPacket();
+}
+
+String MyLora::onReceive()
+{
+    if (LoRa.parsePacket() == 0)
+        return "";
+
+    byte recipient = LoRa.read();
+    byte sender = LoRa.read();
+    byte incomingLength = LoRa.read();
+    // received a packet
+    String incoming = "";
+
+    if (recipient != _localAddress)
+    {
+        Serial.println("This Message is Not For Me!");
+        return "";
+    }
+    // read packet
+    while (LoRa.available())
+    {
+        incoming += (char)LoRa.read();
+    }
+
+    if (incoming.length() != incomingLength)
+    {
+        Serial.println("Message lenght does not match lenght");
+        return "";
+    }
+    Serial.println("");
+    Serial.print("Rssi:");
+    Serial.println(LoRa.packetRssi());
+    return incoming;
+}
+
+String MyLora::parseData(String dataString)
+{
+    return String();
+}

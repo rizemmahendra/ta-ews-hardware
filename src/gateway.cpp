@@ -1,31 +1,48 @@
 #include <Arduino.h>
-#include <Network.h>
+// ===================== LoRa Library & Config =====================
+#include <MyLora.h>
 
-#define WIFI_SSID "Base Tekom 19"
-#define WIFI_PASSWORD "kadrunireng"
-// #define WIFI_SSID "RizemMahendra"
-// #define WIFI_PASSWORD "terserahse"
+const long frequency = 433E6; // LoRa Frequency
+const int nssPin = 5;         // LoRa radio chip select
+const int resetPin = 14;      // LoRa radio reset
+const int dio0Pin = 2;        // change for your board; must be a hardware interrupt pin
+// String data;
+byte localAddress = 0xFF; // address this device
+MyLora *myLora = new MyLora(&nssPin, &resetPin, &dio0Pin, &localAddress);
+// =================================================================
+// #include <Network.h>
 
-#define API_KEY "AIzaSyArrc1cczSPjnnV3MKLRpS_6RksNHjClGw"
-#define USER_EMAIL "gateway@rizemmahendra.com"
-#define USER_PASSWORD "Gateway123"
-#define FIREBASE_PROJECT_ID "ta-ews-rizem-mahendra"
-#define ID_SUNGAI "axBPVZsdXUAjFyWOlXnt"
+// #define WIFI_SSID "Base Tekom 19"
+// #define WIFI_PASSWORD "kadrunireng"
+// // #define WIFI_SSID "RizemMahendra"
+// // #define WIFI_PASSWORD "terserahse"
 
-Network *connection = new Network();
-Waktu *waktu = new Waktu();
-const char *ntpServer = "id.pool.ntp.org";
-const long gmtOffset_sec = 7 * 3600; // GMT+7 in seconds
-const int daylightOffset_sec = 0;
+// #define API_KEY "AIzaSyArrc1cczSPjnnV3MKLRpS_6RksNHjClGw"
+// #define USER_EMAIL "gateway@rizemmahendra.com"
+// #define USER_PASSWORD "Gateway123"
+// #define FIREBASE_PROJECT_ID "ta-ews-rizem-mahendra"
+// #define ID_SUNGAI "axBPVZsdXUAjFyWOlXnt"
+
+// Network *connection = new Network();
+// Waktu *waktu = new Waktu();
+// const char *ntpServer = "id.pool.ntp.org";
+// const long gmtOffset_sec = 7 * 3600; // GMT+7 in seconds
+// const int daylightOffset_sec = 0;
 
 void setup()
 {
     Serial.begin(115200);
-    if (connection->initializeWifi(WIFI_SSID, WIFI_PASSWORD))
+    myLora->initilize(frequency);
+    String data = myLora->onReceive();
+    if (data != "")
     {
-        connection->initializeTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-        // connection->initializeFirebase(API_KEY, FIREBASE_PROJECT_ID, USER_EMAIL, USER_PASSWORD, ID_SUNGAI);
+        Serial.println(data);
     }
+    // if (connection->initializeWifi(WIFI_SSID, WIFI_PASSWORD))
+    // {
+    //     connection->initializeTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    //     // connection->initializeFirebase(API_KEY, FIREBASE_PROJECT_ID, USER_EMAIL, USER_PASSWORD, ID_SUNGAI);
+    // }
 
     // FirebaseJson content;
     // String updateMask = "";
@@ -60,17 +77,23 @@ void setup()
 
 void loop()
 {
-    connection->getCurrentTime(waktu);
+    String data = myLora->onReceive();
+    LoRa.onReceive();
+    if (data != "")
+    {
+        Serial.println(data);
+    }
+    // connection->getCurrentTime(waktu);
     // if (connection->ready())
     // {
     // connection->updateDataRealtimeFirebase(&content, updateMask.c_str());
     // }
-    String valStr(waktu->date);
-    Serial.print("Tanggal : ");
-    Serial.println(waktu->date);
-    Serial.print("Jam : ");
-    Serial.println(waktu->time);
-    Serial.print("onlyJam : ");
-    Serial.println(22 == waktu->getHour());
-    delay(2000);
+    // String valStr(waktu->date);
+    // Serial.print("Tanggal : ");
+    // Serial.println(waktu->date);
+    // Serial.print("Jam : ");
+    // Serial.println(waktu->time);
+    // Serial.print("onlyJam : ");
+    // Serial.println(22 == waktu->getHour());
+    // delay(2000);
 }
