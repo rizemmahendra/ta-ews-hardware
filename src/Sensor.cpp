@@ -27,7 +27,7 @@ void Sensor::initiliazeWaterLevel(uint8_t trigPin, uint8_t echoPin)
  */
 void Sensor::initiliazeTurbdidity(uint8_t turbidityPin)
 {
-    Sensor::_ldr = turbidityPin;
+    Sensor::_ldrPin = turbidityPin;
     pinMode(_ldrPin, INPUT);
 }
 
@@ -54,7 +54,7 @@ double Sensor::getValueWaterLevel()
     digitalWrite(_trigPin, LOW);
 
     long duration = pulseIn(_echoPin, HIGH);
-    return duration / 58.2 //  58.2 is (speed of sound / 2) in cm/us;
+    return duration / 58.2; //  58.2 is (speed of sound / 2) in cm/us;
 }
 
 /**
