@@ -1,6 +1,6 @@
 #include <MyLora.h>
 
-MyLora::MyLora(const int *nssPin, const int *resetPin, const int *dio0Pin, const byte *localAddress)
+MyLora::MyLora(const byte *nssPin, const byte *resetPin, const byte *dio0Pin, const byte *localAddress)
 {
     MyLora::_resetPin = *resetPin;
     MyLora::_nssPin = *nssPin;
@@ -60,6 +60,8 @@ String MyLora::onReceive()
         return "";
     }
     Serial.println("");
+    Serial.print("From:");
+    Serial.println(sender, HEX);
     Serial.print("Rssi:");
     Serial.println(LoRa.packetRssi());
     return incoming;
