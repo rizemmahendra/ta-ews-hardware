@@ -1,6 +1,13 @@
 #include <Arduino.h>
 // ===================== LoRa Library & Config =====================
-#include <MyLora.h>
+// #include <MyLora.h>
+#include <Sensor.h>
+#define trigPin 2
+#define echoPin 3
+#define turbidityPin 4
+#define rainGaugePin 5
+
+Sensor *mySensor = new Sensor();
 
 const long frequency = 433E6; // LoRa Frequency
 const int nssPin = 5;         // LoRa radio chip select
@@ -8,7 +15,7 @@ const int resetPin = 14;      // LoRa radio reset
 const int dio0Pin = 2;        // change for your board; must be a hardware interrupt pin
 // String data;
 byte localAddress = 0xFF; // address this device
-MyLora *myLora = new MyLora(&nssPin, &resetPin, &dio0Pin, &localAddress);
+// MyLora *myLora = new MyLora(&nssPin, &resetPin, &dio0Pin, &localAddress);
 // =================================================================
 // #include <Network.h>
 
@@ -31,13 +38,16 @@ MyLora *myLora = new MyLora(&nssPin, &resetPin, &dio0Pin, &localAddress);
 
 void setup()
 {
-    Serial.begin(115200);
-    myLora->initilize(frequency);
-    String data = myLora->onReceive();
-    if (data != "")
-    {
-        Serial.println(data);
-    }
+    mySensor->initiliazeWaterLevel(trigPin, echoPin);
+    mySensor->initiliazeTurbdidity(turbidityPin);
+    mySensor->initiliazeRainGauge(rainGaugePin);
+    // Serial.begin(115200);
+    // myLora->initilize(frequency);
+    // String data = myLora->onReceive();
+    // if (data != "")
+    // {
+    //     Serial.println(data);
+    // }
     // if (connection->initializeWifi(WIFI_SSID, WIFI_PASSWORD))
     // {
     //     connection->initializeTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
@@ -77,12 +87,12 @@ void setup()
 
 void loop()
 {
-    String data = myLora->onReceive();
-    LoRa.onReceive();
-    if (data != "")
-    {
-        Serial.println(data);
-    }
+    // String data = myLora->onReceive();
+    // LoRa.onReceive();
+    // if (data != "")
+    // {
+    //     Serial.println(data);
+    // }
     // connection->getCurrentTime(waktu);
     // if (connection->ready())
     // {
