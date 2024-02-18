@@ -1,10 +1,10 @@
-#include <Sensor.h>
+#include <MySensor.h>
 
-Sensor::Sensor(/* args */)
+MySensor::MySensor(/* args */)
 {
 }
 
-Sensor::~Sensor()
+MySensor::~MySensor()
 {
 }
 
@@ -13,10 +13,10 @@ Sensor::~Sensor()
  * @param trigPin
  * @param echoPin
  */
-void Sensor::initiliazeWaterLevel(uint8_t trigPin, uint8_t echoPin)
+void MySensor::initiliazeWaterLevel(uint8_t trigPin, uint8_t echoPin)
 {
-    Sensor::_trigPin = trigPin;
-    Sensor::_echoPin = echoPin;
+    MySensor::_trigPin = trigPin;
+    MySensor::_echoPin = echoPin;
     pinMode(_trigPin, OUTPUT);
     pinMode(_echoPin, INPUT);
 }
@@ -25,9 +25,9 @@ void Sensor::initiliazeWaterLevel(uint8_t trigPin, uint8_t echoPin)
  * @brief
  * @param turbidityPin
  */
-void Sensor::initiliazeTurbdidity(uint8_t turbidityPin)
+void MySensor::initiliazeTurbdidity(uint8_t turbidityPin)
 {
-    Sensor::_ldrPin = turbidityPin;
+    MySensor::_ldrPin = turbidityPin;
     pinMode(_ldrPin, INPUT);
 }
 
@@ -35,9 +35,9 @@ void Sensor::initiliazeTurbdidity(uint8_t turbidityPin)
  * @brief
  * @param rainGaugePin
  */
-void Sensor::initiliazeRainGauge(uint8_t rainGaugePin)
+void MySensor::initiliazeRainGauge(uint8_t rainGaugePin)
 {
-    Sensor::_reedSwitchPin = rainGaugePin;
+    MySensor::_reedSwitchPin = rainGaugePin;
     pinMode(_reedSwitchPin, INPUT);
 }
 
@@ -45,7 +45,7 @@ void Sensor::initiliazeRainGauge(uint8_t rainGaugePin)
  * @brief get Value of Ultrasonic sensor
  * @return double - distance in cm
  */
-double Sensor::getValueWaterLevel()
+double MySensor::getValueWaterLevel()
 {
     digitalWrite(_trigPin, LOW);
     delayMicroseconds(2);
@@ -58,10 +58,10 @@ double Sensor::getValueWaterLevel()
 }
 
 /**
- * @brief get Value of LDR Sensor
+ * @brief get Value of LDR MySensor
  * @return double - analog value of LDR
  */
-double Sensor::getValueTurbdity()
+double MySensor::getValueTurbdity()
 {
     int value = 0;
     for (int a = 0; a < 10; a++)
@@ -75,7 +75,7 @@ double Sensor::getValueTurbdity()
  * @brief
  * @return
  */
-double Sensor::getValueRainGauge()
+double MySensor::getValueRainGauge()
 {
     int tickValue = 10;
     return tickValue * 1.0 /* volume of water*/;

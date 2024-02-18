@@ -1,9 +1,9 @@
-#ifndef Sensor_H
-#define Sensor_H
+#ifndef MySensor_H
+#define MySensor_H
 
 #include <Arduino.h>
 
-class Sensor
+class MySensor
 {
 private:
     // Ultrasonik
@@ -17,8 +17,8 @@ private:
     uint8_t _reedSwitchPin;
 
 public:
-    Sensor();
-    ~Sensor();
+    MySensor();
+    ~MySensor();
     void initiliazeWaterLevel(uint8_t trigPin, uint8_t echoPin);
     void initiliazeTurbdidity(uint8_t turbidityPin);
     void initiliazeRainGauge(uint8_t rainGaugePin);
