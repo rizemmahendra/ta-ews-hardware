@@ -45,7 +45,7 @@ void MySensor::initiliazeRainGauge(uint8_t rainGaugePin)
  * @brief get Value of Ultrasonic sensor
  * @return double - distance in cm
  */
-double MySensor::getValueWaterLevel()
+void MySensor::getValueWaterLevel(DataSensor *sensor)
 {
     digitalWrite(_trigPin, LOW);
     delayMicroseconds(2);
@@ -54,29 +54,43 @@ double MySensor::getValueWaterLevel()
     digitalWrite(_trigPin, LOW);
 
     long duration = pulseIn(_echoPin, HIGH);
-    return duration / 58.2; //  58.2 is (speed of sound / 2) in cm/us;
+    // float distance = duration / 58.2; //  58.2 is (speed of sound / 2) in cm/us;
+    float distance = (duration / 2) * 0.0343;
+    sensor->value = distance;
+
+    if (distance <= 5)
+    {
+        sensor->status = "Rendah";
+    }
+    else if (distance <= 10)
+    {
+        sensor->status = "Sedang";
+    }
+    else
+    {
+        sensor->status = "Tinggi";
+    }
 }
 
 /**
  * @brief get Value of LDR MySensor
  * @return double - analog value of LDR
  */
-double MySensor::getValueTurbdity()
+void MySensor::getValueTurbdity(DataSensor *sensor)
 {
     int value = 0;
     for (int a = 0; a < 10; a++)
     {
         value += analogRead(_ldrPin);
     }
-    return value / 10;
 }
 
 /**
  * @brief
  * @return
  */
-double MySensor::getValueRainGauge()
+void MySensor::getValueRainGauge(DataSensor *sensor)
 {
     int tickValue = 10;
-    return tickValue * 1.0 /* volume of water*/;
+    tickValue * 1.0 /* volume of water*/;
 }

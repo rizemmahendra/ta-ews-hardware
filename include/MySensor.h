@@ -2,6 +2,7 @@
 #define MySensor_H
 
 #include <Arduino.h>
+#include <DataSensor.cpp>
 
 class MySensor
 {
@@ -22,9 +23,9 @@ public:
     void initiliazeWaterLevel(uint8_t trigPin, uint8_t echoPin);
     void initiliazeTurbdidity(uint8_t turbidityPin);
     void initiliazeRainGauge(uint8_t rainGaugePin);
-    double getValueWaterLevel();
-    double getValueTurbdity();
-    double getValueRainGauge();
+    void getValueWaterLevel(DataSensor *sensor);
+    void getValueTurbdity(DataSensor *sensor);
+    void getValueRainGauge(DataSensor *sensor);
 };
 
 #endif

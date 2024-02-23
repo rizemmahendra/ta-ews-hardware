@@ -1,21 +1,14 @@
 #include <Arduino.h>
 // ===================== LoRa Library & Config =====================
-// #include <MyLora.h>
-#include <Sensor.h>
-#define trigPin 2
-#define echoPin 3
-#define turbidityPin 4
-#define rainGaugePin 5
-
-Sensor *mySensor = new Sensor();
+#include <MyLora.h>
 
 const long frequency = 433E6; // LoRa Frequency
-const int nssPin = 5;         // LoRa radio chip select
-const int resetPin = 14;      // LoRa radio reset
-const int dio0Pin = 2;        // change for your board; must be a hardware interrupt pin
-// String data;
+const byte nssPin = 5;        // LoRa radio chip select
+const byte resetPin = 14;     // LoRa radio reset
+const byte dio0Pin = 2;       // change for your board; must be a hardware interrupt pin
+String data;
 byte localAddress = 0xFF; // address this device
-// MyLora *myLora = new MyLora(&nssPin, &resetPin, &dio0Pin, &localAddress);
+MyLora *myLora = new MyLora(&nssPin, &resetPin, &dio0Pin, &localAddress);
 // =================================================================
 // #include <Network.h>
 
@@ -38,11 +31,11 @@ byte localAddress = 0xFF; // address this device
 
 void setup()
 {
-    mySensor->initiliazeWaterLevel(trigPin, echoPin);
-    mySensor->initiliazeTurbdidity(turbidityPin);
-    mySensor->initiliazeRainGauge(rainGaugePin);
-    // Serial.begin(115200);
-    // myLora->initilize(frequency);
+    // mySensor->initiliazeWaterLevel(trigPin, echoPin);
+    // mySensor->initiliazeTurbdidity(turbidityPin);
+    // mySensor->initiliazeRainGauge(rainGaugePin);
+    Serial.begin(115200);
+    myLora->initilize(frequency);
     // String data = myLora->onReceive();
     // if (data != "")
     // {
@@ -87,12 +80,11 @@ void setup()
 
 void loop()
 {
-    // String data = myLora->onReceive();
-    // LoRa.onReceive();
-    // if (data != "")
-    // {
-    //     Serial.println(data);
-    // }
+    data = myLora->onReceive();
+    if (data != "")
+    {
+        Serial.println(data);
+    }
     // connection->getCurrentTime(waktu);
     // if (connection->ready())
     // {
