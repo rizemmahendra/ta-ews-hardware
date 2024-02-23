@@ -19,6 +19,8 @@ void MyLora::initilize(const long frequency)
         while (true)
             ;
     }
+    LoRa.setSignalBandwidth(10.4E3);
+    LoRa.setTxPower(20);
     Serial.println("Lora init Succeeded");
 }
 
