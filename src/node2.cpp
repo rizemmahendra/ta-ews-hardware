@@ -1,167 +1,83 @@
-#include <Arduino.h>
 // ===================== LoRa Library & Config =====================
-#include <SPI.h>
-#include <LoRa.h>
+#include <MyLora.h>
 
-const long frequency = 433E6; // LoRa Frequency
-const int nssPin = 10;        // LoRa radio chip select
-const int resetPin = 9;       // LoRa radio reset
-const int dio0Pin = 2;        // change for your board; must be a hardware interrupt pin
-String data;
-byte localAddress = 0x02; // address this device
-byte destination = 0x03;  // address destination
+const long frequency = 433E6;   // LoRa Frequency
+const byte nssPin = 10;         // LoRa radio chip select
+const byte resetPin = 9;        // LoRa radio reset
+const byte dio0Pin = 2;         // change for your board; must be a hardware interrupt pin
+const byte localAddress = 0x02; // address this device
+const byte destination = 0xFF;  // address destination
 unsigned long lastSendTime = 0;
-unsigned int interval = 2000;
+unsigned int interval = 500;
+
+MyLora *myLora = new MyLora(&nssPin, &resetPin, &dio0Pin, &localAddress);
+String message;
+// =================================================================
+
+// ==================== Sensor Library & Config ====================
+#include <MySensor.h>
+// ================== Ultrasonik ==================
+const byte trigPin = 4;
+const byte echoPin = 5;
+DataSensor *ultrasonik = new DataSensor();
+// ================== Turbidity ===================
+const byte ldrPin = A0;
+DataSensor *ldr = new DataSensor();
+// ================== Rain Gauge ==================
+const byte reedSwitchPin = 3;
+DataSensor *reedSwitch = new DataSensor();
+// ================================================
+
+MySensor *mySensor = new MySensor();
 // =================================================================
 
 // ================== ArduinoJSON Library & Config ==================
 #include <ArduinoJson.h>
 // =================================================================
 
-// ================== Ultrasonik Library & Config ==================
-const int trigPin = 4;
-const int echoPin = 5;
-// =================================================================
-
-// ================== Turbidity Library & Config ==================
-const int ldrPin = A0;
-// =================================================================
-
-// ================== Rain Gauge Library & Config ==================
-const int reedSwitchPin = 3;
-// =================================================================
-
-float ultrasonik()
-{
-    digitalWrite(trigPin, LOW);
-    delayMicroseconds(2);
-    digitalWrite(trigPin, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(trigPin, LOW);
-
-    int durasi = pulseIn(echoPin, HIGH);
-    float jarak = (durasi / 2) * 0.034;
-    return jarak;
-}
-
-float turbidity()
-{
-    float value = analogRead(ldrPin);
-    return value;
-}
-
-float rainGauge()
-{
-    int value = digitalRead(reedSwitchPin);
-    return value;
-}
-
-void setupLora()
-{
-    LoRa.setPins(nssPin, resetPin, dio0Pin);
-    if (!LoRa.begin(frequency))
-    {
-        Serial.println("Lora init failed. Check your connections");
-        while (true)
-            ;
-    }
-    Serial.println("Lora init Succeeded");
-}
-
-void sendMessage(String message)
-{
-    LoRa.beginPacket();
-    LoRa.write(destination);
-    LoRa.write(localAddress);
-    LoRa.write(message.length());
-    LoRa.print(message);
-    LoRa.endPacket();
-}
-
-String onReceive(int packetSize)
-{
-    if (packetSize == 0)
-        return "";
-
-    byte recipient = LoRa.read();
-    byte sender = LoRa.read();
-    byte incomingLength = LoRa.read();
-    // received a packet
-    String incoming = "";
-
-    if (recipient != localAddress)
-    {
-        Serial.println("This Message is Not For Me!");
-        return "";
-    }
-    // read packet
-    while (LoRa.available())
-    {
-        incoming += (char)LoRa.read();
-    }
-
-    if (incoming.length() != incomingLength)
-    {
-        Serial.println("Message lenght does not match lenght");
-        return "";
-    }
-
-    // print RSSI of packet
-    // Serial.println((String)incoming);
-    // Serial.print("' with RSSI ");
-    // Serial.println(LoRa.packetRssi());
-    // Serial.println("Received from: 0x" + String(sender, HEX));
-    // Serial.println("Sent to: 0x" + String(recipient, HEX));
-    // Serial.println("Message length: " + String(incomingLength));
-    // Serial.println("Message: " + incoming);
-    // Serial.println("RSSI: " + String(LoRa.packetRssi()));
-    // Serial.println("Snr: " + String(LoRa.packetSnr()));
-    // Serial.println();
-    return incoming;
-}
-
 void setup()
 {
     Serial.begin(9600);
-    pinMode(trigPin, OUTPUT);
-    pinMode(echoPin, INPUT);
-    pinMode(ldrPin, INPUT);
-    pinMode(reedSwitchPin, INPUT);
-    setupLora();
+
+    mySensor->initiliazeWaterLevel(trigPin, echoPin);
+    mySensor->initiliazeTurbdidity(ldrPin);
+    mySensor->initiliazeRainGauge(reedSwitchPin);
+
+    myLora->initilize(frequency);
 }
+
 void loop()
 {
-    data = onReceive(LoRa.parsePacket());
-    if (data != "")
+    message = myLora->onReceive();
+    if (message != "")
     {
-        Serial.println(data);
-    }
-    StaticJsonDocument<256> dataNode;
-    // dataNode["jarak"] = ultrasonik();
-    dataNode["kekeruhan"] = turbidity();
-    dataNode["hujan"] = rainGauge();
-    String message;
-    serializeJson(dataNode, message);
+        Serial.println(message);
+        StaticJsonDocument<128> dataFromNode1;
+        deserializeJson(dataFromNode1, message);
 
-    if (data != "")
-    {
-        Serial.println("=====================================");
-        Serial.println("incoming : " + data);
-        Serial.println("me : " + message);
+        mySensor->getValueWaterLevel(ultrasonik);
+        mySensor->getValueTurbdity(ldr);
+        mySensor->getValueRainGauge(reedSwitch);
 
-        StaticJsonDocument<512> allData;
-        allData["node1"] = data;
-        allData["node2"] = message;
-        String allmessage;
-        serializeJson(allData, allmessage);
+        StaticJsonDocument<256> data;
+        data["node1"] = dataFromNode1.as<JsonObject>();
+        data["node2"]["t"] = ultrasonik->value;
+        data["node2"]["ts"] = ultrasonik->status;
+        data["node2"]["k"] = ldr->value;
+        data["node2"]["ks"] = ldr->status;
+        data["node2"]["h"] = reedSwitch->value;
+        data["node2"]["hs"] = reedSwitch->status;
 
-        Serial.println("all : " + allmessage);
-        Serial.println("=====================================");
-    }
-    if (millis() - lastSendTime > interval)
-    {
-        sendMessage(message);
+        message = "";
+        serializeJson(data, message);
+
+        unsigned long prev2 = millis();
+        myLora->sendMessage(destination, message);
+        Serial.print("lama mengirimkan data : ");
+        Serial.println(millis() - prev2, DEC);
         Serial.println("mengirim data : " + message);
-        lastSendTime = millis();
+        Serial.println("-----------------------------------------");
+        message = "";
+        LoRa.receive();
     }
 }

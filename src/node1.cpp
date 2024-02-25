@@ -51,22 +51,29 @@ void loop()
     mySensor->getValueWaterLevel(ultrasonik);
     mySensor->getValueTurbdity(ldr);
     mySensor->getValueRainGauge(reedSwitch);
+    Serial.println(ultrasonik->value);
 
-    StaticJsonDocument<128> data;
-    data["t"] = ultrasonik->value;
-    data["ts"] = ultrasonik->status;
-    data["k"] = ldr->value;
-    data["ks"] = ldr->status;
-    data["h"] = reedSwitch->value;
-    data["hs"] = reedSwitch->status;
+    static unsigned long current = 0;
 
-    serializeJson(data, message);
+    if (millis() - current > 5000 || current == 0)
+    {
+        current = millis();
+        StaticJsonDocument<128> data;
+        data["t"] = ultrasonik->value;
+        data["ts"] = ultrasonik->status;
+        data["k"] = ldr->value;
+        data["ks"] = ldr->status;
+        data["h"] = reedSwitch->value;
+        data["hs"] = reedSwitch->status;
 
-    unsigned long prev2 = millis();
-    myLora->sendMessage(destination, message);
-    Serial.print("lama mengirimkan data : ");
-    Serial.println(millis() - prev2, DEC);
-    Serial.println("mengirim data : " + message);
-    Serial.println("-----------------------------------------");
-    message = "";
+        serializeJson(data, message);
+
+        unsigned long prev2 = millis();
+        myLora->sendMessage(destination, message);
+        Serial.print("lama mengirimkan data : ");
+        Serial.println(millis() - prev2, DEC);
+        Serial.println("mengirim data : " + message);
+        Serial.println("-----------------------------------------");
+        message = "";
+    }
 }
