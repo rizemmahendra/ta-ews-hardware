@@ -19,6 +19,7 @@ void MySensor::initiliazeWaterLevel(uint8_t trigPin, uint8_t echoPin)
     MySensor::_echoPin = echoPin;
     pinMode(_trigPin, OUTPUT);
     pinMode(_echoPin, INPUT);
+    digitalWrite(_trigPin, LOW);
 }
 
 /**
@@ -35,10 +36,12 @@ void MySensor::initiliazeTurbdidity(uint8_t turbidityPin)
  * @brief
  * @param rainGaugePin
  */
-void MySensor::initiliazeRainGauge(uint8_t rainGaugePin)
+void MySensor::initiliazeRainGauge(uint8_t rainGaugePin, float tickVolume, void (*callback)(void))
 {
     MySensor::_reedSwitchPin = rainGaugePin;
+    MySensor::_tickVolume = tickVolume;
     pinMode(_reedSwitchPin, INPUT);
+    attachInterrupt(digitalPinToInterrupt(_reedSwitchPin), callback, FALLING);
 }
 
 /**
@@ -47,7 +50,6 @@ void MySensor::initiliazeRainGauge(uint8_t rainGaugePin)
  */
 void MySensor::getValueWaterLevel(DataSensor *sensor)
 {
-    digitalWrite(_trigPin, LOW);
     delayMicroseconds(2);
     digitalWrite(_trigPin, HIGH);
     delayMicroseconds(10);
@@ -60,15 +62,15 @@ void MySensor::getValueWaterLevel(DataSensor *sensor)
 
     if (distance <= 5)
     {
-        sensor->status = "Rendah";
+        sensor->status = "L";
     }
     else if (distance <= 10)
     {
-        sensor->status = "Sedang";
+        sensor->status = "M";
     }
     else
     {
-        sensor->status = "Tinggi";
+        sensor->status = "H";
     }
 }
 
@@ -83,14 +85,22 @@ void MySensor::getValueTurbdity(DataSensor *sensor)
     {
         value += analogRead(_ldrPin);
     }
+    sensor->value = value / 10;
 }
 
+void MySensor::tickIncreament()
+{
+    MySensor::_tickValue++;
+}
 /**
  * @brief
  * @return
  */
 void MySensor::getValueRainGauge(DataSensor *sensor)
 {
-    int tickValue = 10;
-    tickValue * 1.0 /* volume of water*/;
+    sensor->value = MySensor::_tickValue * MySensor::_tickVolume;
+}
+void MySensor::resetTickCount()
+{
+    MySensor::_tickValue = 0;
 }
