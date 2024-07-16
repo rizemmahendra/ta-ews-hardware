@@ -15,13 +15,13 @@ void MyLora::initilize(const long frequency)
     LoRa.setPins(_nssPin, _resetPin, _dio0Pin);
     if (!LoRa.begin(frequency))
     {
-        Serial.println("Lora init failed. Check your connections");
+        Serial.println(F("Lora init failed. Check your connections"));
         while (true)
             ;
     }
-    LoRa.setSignalBandwidth(10.4E3);
+    // LoRa.setSignalBandwidth(10.4E3);
     LoRa.setTxPower(20);
-    Serial.println("Lora init Succeeded");
+    Serial.println(F("Lora init Succeeded"));
 }
 
 void MyLora::sendMessage(byte destination, String message)
@@ -47,7 +47,7 @@ String MyLora::onReceive()
 
     if (recipient != _localAddress)
     {
-        Serial.println("This Message is Not For Me!");
+        Serial.println(F("This Message is Not For Me!"));
         return "";
     }
     // read packet
@@ -58,13 +58,13 @@ String MyLora::onReceive()
 
     if (incoming.length() != incomingLength)
     {
-        Serial.println("Message lenght does not match lenght");
+        Serial.println(F("Message lenght does not match lenght"));
         return "";
     }
     Serial.println("");
-    Serial.print("From:");
+    Serial.print(F("From:"));
     Serial.println(sender, HEX);
-    Serial.print("Rssi:");
+    Serial.print(F("Rssi:"));
     Serial.println(LoRa.packetRssi());
     return incoming;
 }
