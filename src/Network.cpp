@@ -2,7 +2,6 @@
 #include <Network.h>
 #include <Firebase_ESP_Client.h>
 #include <addons/TokenHelper.h>
-#include <addons/RTDBHelper.h>
 
 Network::Network()
 {
@@ -51,16 +50,19 @@ bool Network::initializeWifi(const char *ssid, const char *password)
  * @param id_sungai Id Document sungai di firebase
  * @note email and password required if anonymous authentication not active
  */
-void Network::initializeFirebase(const char *api_key, const char *projectId, const char *email, const char *password, const char *id_sungai)
+void Network::initializeFirebase(const char *apiKey, const char *projectId, const char *email, const char *password, const char *idSungai, const char *clientEmail, const char *privateKey)
 {
     Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
     Firebase.reconnectNetwork(true);
 
-    Network::_config.api_key = api_key;
+    Network::_config.api_key = apiKey;
+    Network::_config.service_account.data.client_email = clientEmail;
+    Network::_config.service_account.data.project_id = projectId;
+    Network::_config.service_account.data.private_key = privateKey;
     Network::_config.token_status_callback = tokenStatusCallback;
     Network::_config.timeout.serverResponse = 10 * 1000;
     Network::_projectId = projectId;
-    Network::_idSungai = id_sungai;
+    Network::_idSungai = idSungai;
 
     Network::_auth.user.email = email;
     Network::_auth.user.password = password;
@@ -144,6 +146,29 @@ void Network::updateDataHistoryFirebase(FirebaseJson *json, const char *tanggal,
 
     Serial.println("Create a document ... ");
     if (Firebase.Firestore.createDocument(&_fbdo, _projectId, "", documentPath.c_str(), json->raw()))
+    {
+        Serial.printf("ok\n%s\n\n", _fbdo.payload().c_str());
+    }
+    else
+    {
+        Serial.println(_fbdo.errorReason());
+    }
+}
+
+void Network::sendNotification()
+{
+    FCM_HTTPv1_JSON_Message msg;
+    FirebaseJson payload;
+
+    payload.add("title", "Test Notification");
+    payload.add("body", "Ini Body Notification");
+    payload.add("channelId", "danger_notification");
+
+    msg.topic = "ta_ews_rizemmahendra";
+    msg.android.priority = "high";
+    msg.data = payload.raw();
+
+    if (Firebase.FCM.send(&_fbdo, &msg))
     {
         Serial.printf("ok\n%s\n\n", _fbdo.payload().c_str());
     }
