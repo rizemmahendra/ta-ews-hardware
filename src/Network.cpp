@@ -36,7 +36,7 @@ bool Network::initializeWifi(const char *ssid, const char *password)
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED)
     {
-        Serial.print(".");
+        delay(1000);
     }
     return true;
 }
@@ -116,22 +116,23 @@ bool Network::ready()
  * @param json Pointer to FirebaseJson Object
  * @param updateMask Pointer to String update mask
  */
-void Network::updateDataRealtimeFirebase(FirebaseJson *json, const char *updateMask)
+bool Network::updateDataRealtimeFirebase(FirebaseJson *json, const char *updateMask)
 {
     FirebaseJson content;
 
     String documentPath = "TA%20EWS%20RIZEM%20MAHENDRA/" + String(_idSungai) + "/data_sensor/realtime";
 
-    Serial.print("Update a document... ");
+    // Serial.print("Update a document... ");
 
+    ESP_LOGW("SEND NOTIFICATION", "Update Data Realtime...");
     if (Firebase.Firestore.patchDocument(&_fbdo, _projectId, "", documentPath.c_str(), json->raw(), updateMask))
     {
-        Serial.printf("ok\n%s\n\n", _fbdo.payload().c_str());
+        Serial.printf("Ok\n%s\n\n", _fbdo.payload().c_str());
+        return true;
     }
-    else
-    {
-        Serial.println(_fbdo.errorReason());
-    }
+
+    Serial.println(_fbdo.errorReason());
+    return false;
 }
 
 /**
@@ -155,25 +156,29 @@ void Network::updateDataHistoryFirebase(FirebaseJson *json, const char *tanggal,
     }
 }
 
-void Network::sendNotification()
+void Network::sendNotification(const char *title, const char *body, const char *channelId)
 {
     FCM_HTTPv1_JSON_Message msg;
     FirebaseJson payload;
 
-    payload.add("title", "Test Notification");
-    payload.add("body", "Ini Body Notification");
-    payload.add("channelId", "danger_notification");
+    payload.add("title", title);
+    payload.add("body", body);
+    payload.add("channelId", channelId);
 
     msg.topic = "ta_ews_rizemmahendra";
     msg.android.priority = "high";
     msg.data = payload.raw();
 
+    // Serial.println("Send Message :  ");
+    ESP_LOGW("SEND NOTIFICATION", "Send Notification...");
     if (Firebase.FCM.send(&_fbdo, &msg))
     {
-        Serial.printf("ok\n%s\n\n", _fbdo.payload().c_str());
+        ESP_LOGI("SEND NOTIFICATION", "Send Notification Successful");
+        // Serial.printf("Ok\n%s\n\n", _fbdo.payload());
     }
     else
     {
+        ESP_LOGI("SEND NOTIFICATION", "Send Notification Failed");
         Serial.println(_fbdo.errorReason());
     }
 }

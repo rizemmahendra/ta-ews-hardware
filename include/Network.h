@@ -25,9 +25,9 @@ public:
     void initializeFirebase(const char *apiKey, const char *projectId, const char *email, const char *password, const char *idSungai, const char *clientEmail = nullptr, const char *privateKey = nullptr);
     void initializeTime(long gmtOffset_sec, int daylightOffset_sec, const char *urlNTPServer);
     void getCurrentTime(Waktu *waktu);
-    void updateDataRealtimeFirebase(FirebaseJson *json, const char *updateMask);
+    bool updateDataRealtimeFirebase(FirebaseJson *json, const char *updateMask);
     void updateDataHistoryFirebase(FirebaseJson *json, const char *tanggal, const char *jam);
-    void sendNotification();
+    void sendNotification(const char *title, const char *body, const char *channelId);
     bool ready();
 };
 
