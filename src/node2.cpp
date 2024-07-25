@@ -19,14 +19,14 @@ String message;
 // ================== Ultrasonik ==================
 const byte trigPin = 4;
 const byte echoPin = 5;
-DataSensor *ultrasonik = new DataSensor();
+DataSensor *ultrasonik = new DataSensor("L");
 // ================== Turbidity ===================
 const byte ldrPin = A0;
-DataSensor *ldr = new DataSensor();
+DataSensor *ldr = new DataSensor("CL");
 // ================== Rain Gauge ==================
 const byte reedSwitchPin = 3;
 const float tickVolume = 1.4;
-DataSensor *reedSwitch = new DataSensor();
+DataSensor *reedSwitch = new DataSensor("NR");
 // ================================================
 
 MySensor *mySensor = new MySensor();
@@ -53,8 +53,12 @@ void setup()
     Serial.begin(9600);
 
     mySensor->initiliazeWaterLevel(trigPin, echoPin);
+    mySensor->setThresholdWaterLevel(5, 7);
     mySensor->initiliazeTurbdidity(ldrPin);
+    mySensor->setThresholdTurbidity(950, 800);
     mySensor->initiliazeRainGauge(reedSwitchPin, tickVolume, handleReedIntterupt);
+    mySensor->setThresholdRainGauge(4, 8);
+
     myLora->initilize(frequency);
 }
 
@@ -82,12 +86,12 @@ void loop()
 
         StaticJsonDocument<256> data;
         data["node1"] = dataFromNode1.as<JsonObject>();
-        data["node2"]["t"] = ultrasonik->value;
-        data["node2"]["ts"] = ultrasonik->status;
-        data["node2"]["k"] = ldr->value;
-        data["node2"]["ks"] = ldr->status;
-        data["node2"]["h"] = reedSwitch->value;
-        data["node2"]["hs"] = reedSwitch->status;
+        data["node2"]["w"] = ultrasonik->value;
+        data["node2"]["ws"] = ultrasonik->status;
+        data["node2"]["t"] = ldr->value;
+        data["node2"]["ts"] = ldr->status;
+        data["node2"]["r"] = reedSwitch->value;
+        data["node2"]["rs"] = reedSwitch->status;
 
         message = "";
         serializeJson(data, message);
@@ -101,4 +105,5 @@ void loop()
         message = "";
         LoRa.receive();
     }
+    delay(100);
 }
