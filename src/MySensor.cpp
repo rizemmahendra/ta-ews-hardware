@@ -116,7 +116,7 @@ void MySensor::getValueWaterLevel(DataSensor *sensor)
  */
 void MySensor::getValueTurbdity(DataSensor *sensor)
 {
-    int value = 0;
+    float value = 0;
     for (int a = 0; a < 10; a++)
     {
         value += analogRead(_ldrPin);
@@ -126,11 +126,11 @@ void MySensor::getValueTurbdity(DataSensor *sensor)
     /**
      * CL (Clear),M (Murky),T (Turbid)
      */
-    if (value < MySensor::_turbidityClearThreshold)
+    if (value > MySensor::_turbidityClearThreshold)
     {
         sensor->status = "CL";
     }
-    else if (value < MySensor::_turbidityMurkyThreshold)
+    else if (value > MySensor::_turbidityMurkyThreshold)
     {
         sensor->status = "M";
     }
@@ -150,7 +150,7 @@ void MySensor::tickIncreament()
  */
 void MySensor::getValueRainGauge(DataSensor *sensor)
 {
-    int value = 0;
+    float value = 0;
     value = MySensor::_tickValue * MySensor::_tickVolume;
     sensor->value = value;
     /**
