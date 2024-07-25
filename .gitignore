@@ -5,4 +5,4 @@
 .vscode/ipch
 .vscode/tasks.json
 .vscode/settings.json
-.env
+*/env.cpp
