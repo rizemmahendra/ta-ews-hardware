@@ -55,7 +55,7 @@ void setup()
     mySensor->initiliazeWaterLevel(trigPin, echoPin);
     mySensor->setThresholdWaterLevel(5, 7);
     mySensor->initiliazeTurbdidity(ldrPin);
-    mySensor->setThresholdTurbidity(1000, 800);
+    mySensor->setThresholdTurbidity(950, 800);
     mySensor->initiliazeRainGauge(reedSwitchPin, tickVolume, handleReedIntterupt);
     mySensor->setThresholdRainGauge(4, 8);
 
@@ -97,4 +97,5 @@ void loop()
         Serial.println(F("-----------------------------------------"));
         message = "";
     }
+    delay(500);
 }
