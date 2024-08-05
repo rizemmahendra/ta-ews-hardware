@@ -68,14 +68,14 @@ void setup()
 
     // core 0 for RF app like BLE, and Wifi: use it for task have little execution time
     xTaskCreatePinnedToCore(buzzerTask, "Buzzer Task", 2048, NULL, 1, &handleBuzzer, 0);                         // 2KB
-    xTaskCreatePinnedToCore(parsingDataTask, "Parsing Data", 4096, NULL, 3, NULL, 0);                            // 2KB
+    xTaskCreatePinnedToCore(parsingDataTask, "Parsing Data", 5120, NULL, 3, NULL, 0);                            // 2KB
     xTaskCreatePinnedToCore(determineLevelOfDanger, "Determine Level", 2048, NULL, 2, &handleDetermineLevel, 0); // 2KB
 
     // core 1 for other app
     xTaskCreatePinnedToCore(receiveLoraTask, "Receive Lora", 2048, NULL, 4, &handleReceiveLora, 1);                                  // 2KB
-    xTaskCreatePinnedToCore(connectWifi, "Connect Wifi", 5120, NULL, 2, &handleConnectWifi, 1);                                      // 5KB
-    xTaskCreatePinnedToCore(updateDataRealtime, "Update Realtime", 10240, NULL, 2, &handleUpdateRealtime, 1);                        // 10KB
-    xTaskCreatePinnedToCore(historyAndNotificationTask, "History & Notification", 10240, NULL, 1, &handleHistoryAndNotification, 1); // 10KB
+    xTaskCreatePinnedToCore(connectWifi, "Connect Wifi", 5120, NULL, 3, &handleConnectWifi, 1);                                      // 5KB
+    xTaskCreatePinnedToCore(historyAndNotificationTask, "History & Notification", 10240, NULL, 2, &handleHistoryAndNotification, 1); // 10KB
+    xTaskCreatePinnedToCore(updateDataRealtime, "Update Realtime", 10240, NULL, 1, &handleUpdateRealtime, 1);                        // 10KB
 }
 
 void loop() {}
@@ -91,13 +91,17 @@ void receiveLoraTask(void *pvParameter)
         message = myLora->onReceive();
         if (message != "")
         {
-            Serial.println(message);
-            if (xQueueSend(parseQueue, &message, pdMS_TO_TICKS(100) != pdPASS))
+            // Serial.println(message);
+            if (xQueueSend(parseQueue, &message, pdMS_TO_TICKS(100)) != pdPASS)
             {
                 ESP_LOGE("RECEIVE LORA", "Gagal Mengirim ke Queue Parse");
             }
+            else
+            {
+                ESP_LOGI("RECEIVE LORA", "Berhasil Mengirim ke Queue Parse");
+            }
         }
-        vTaskDelay(500 / portTICK_PERIOD_MS); // 500ms
+        vTaskDelay(20 / portTICK_PERIOD_MS); // 20ms
     }
 }
 // =================================================================================
@@ -138,30 +142,31 @@ void parsingDataTask(void *pvParemeter)
     while (true)
     {
         // ensures delay calls are not missed due to use of continue
-        vTaskDelay(500 / portTICK_PERIOD_MS); // 1s
+        vTaskDelay(20 / portTICK_PERIOD_MS); // 1s
 
-        if (xQueueReceive(parseQueue, &message, pdTICKS_TO_MS(10)) == pdPASS)
+        if (xQueueReceive(parseQueue, &message, pdTICKS_TO_MS(100)) == pdPASS)
         {
+            Serial.println(message);
             if (!json->setJsonData(message))
             {
                 ESP_LOGE("PARSING DATA", "Error parsing string to json");
                 continue;
             }
             // set Data Node 1
-            setFloatData(json, data, &node1->waterValue, "node1/waterValue");
-            setStringData(json, data, &node1->waterStatus, "node1/waterStatus");
-            setFloatData(json, data, &node1->turbidityValue, "node1/turbidityValue");
-            setStringData(json, data, &node1->turbidityStatus, "node1/turbidityStatus");
-            setFloatData(json, data, &node1->rainValue, "node1/rainValue");
-            setStringData(json, data, &node1->rainStatus, "node1/rainStatus");
+            setFloatData(json, data, &node1->waterValue, "node1/w");
+            setStringData(json, data, &node1->waterStatus, "node1/ws");
+            setFloatData(json, data, &node1->turbidityValue, "node1/t");
+            setStringData(json, data, &node1->turbidityStatus, "node1/ts");
+            setFloatData(json, data, &node1->rainValue, "node1/r");
+            setStringData(json, data, &node1->rainStatus, "node1/rs");
 
             // set Data Node 2
-            setFloatData(json, data, &node2->waterValue, "node2/waterValue");
-            setStringData(json, data, &node2->waterStatus, "node2/waterStatus");
-            setFloatData(json, data, &node2->turbidityValue, "node2/turbidityValue");
-            setStringData(json, data, &node2->turbidityStatus, "node2/turbidityStatus");
-            setFloatData(json, data, &node2->rainValue, "node2/rainValue");
-            setStringData(json, data, &node2->rainStatus, "node2/rainStatus");
+            setFloatData(json, data, &node2->waterValue, "node2/w");
+            setStringData(json, data, &node2->waterStatus, "node2/ws");
+            setFloatData(json, data, &node2->turbidityValue, "node2/t");
+            setStringData(json, data, &node2->turbidityStatus, "node2/ts");
+            setFloatData(json, data, &node2->rainValue, "node2/r");
+            setStringData(json, data, &node2->rainStatus, "node2/rs");
             ESP_LOGI("PARSING DATA", "Parsing Data Done");
 
             // Notify to Determine Level Task that data ready
@@ -317,7 +322,9 @@ void connectWifi(void *pvParameter)
                 if (eTaskGetState(handleUpdateRealtime) == eSuspended || eTaskGetState(handleHistoryAndNotification) == eSuspended)
                 {
                     if (connection->ready())
+                    {
                         resumeTask();
+                    }
                 }
             }
         }
@@ -326,7 +333,9 @@ void connectWifi(void *pvParameter)
             if (eTaskGetState(handleUpdateRealtime) == eSuspended || eTaskGetState(handleHistoryAndNotification) == eSuspended)
             {
                 if (connection->ready())
+                {
                     resumeTask();
+                }
             }
         }
         vTaskDelay(5000 / portTICK_PERIOD_MS); // 5s
@@ -353,30 +362,36 @@ void updateDataRealtime(void *pvParameter)
         current = millis();
         if ((current - prevSend) > interval && newData)
         {
-            if (xSemaphoreTake(xHTTPaccess, portMAX_DELAY) == pdTRUE)
+            if (connection->ready())
             {
-                updateMask = "";
-                // Node 1
-                node1->toJson(&content);
-                updateMask += "node1.levelDanger, node1.waterLevel, node1.waterLevelStatus, node1.waterTurbidity, node1.waterTurbidityStatus, node1.rainIntensity, node1.rainIntensityStatus,";
-
-                // Node 2
-                node2->toJson(&content);
-                updateMask += "node2.levelDanger, node2.waterLevel, node2.waterLevelStatus, node2.waterTurbidity, node2.waterTurbidityStatus, node2.rainIntensity, node2.rainIntensityStatus,";
-
-                // content.toString(Serial, true);
-                if (connection->updateDataRealtimeFirebase(&content, updateMask.c_str()))
+                if (xSemaphoreTake(xHTTPaccess, portMAX_DELAY) == pdTRUE)
                 {
-                    ESP_LOGI("UPDATE REALTIME", "Success Update Realtime");
-                    newData = false;
+                    updateMask = "";
+                    // Node 1
+                    node1->toJson(&content);
+                    updateMask += "node1.levelDanger, node1.waterLevel, node1.waterLevelStatus, node1.waterTurbidity, node1.waterTurbidityStatus, node1.rainIntensity, node1.rainIntensityStatus,";
+
+                    // Node 2
+                    node2->toJson(&content);
+                    updateMask += "node2.levelDanger, node2.waterLevel, node2.waterLevelStatus, node2.waterTurbidity, node2.waterTurbidityStatus, node2.rainIntensity, node2.rainIntensityStatus,";
+
+                    if (connection->updateDataRealtimeFirebase(&content, updateMask.c_str()))
+                    {
+                        ESP_LOGI("UPDATE REALTIME", "Success Update Realtime");
+                        newData = false;
+                    }
+                    else
+                    {
+                        ESP_LOGE("UPDATE REALTIME", "Failed Update, check connection or data");
+                    }
+                    xSemaphoreGive(xHTTPaccess);
                 }
-                else
-                {
-                    ESP_LOGE("UPDATE REALTIME", "Failed Update, check connection or data");
-                }
-                xSemaphoreGive(xHTTPaccess);
+                prevSend = current;
             }
-            prevSend = current;
+            else
+            {
+                ESP_LOGE("UPDATE REALTIME", "Connection Not Ready");
+            }
         }
         vTaskDelay(100 / portTICK_PERIOD_MS); // 1s
     }

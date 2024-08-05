@@ -34,6 +34,7 @@ bool Network::initializeWifi(const char *ssid, const char *password)
     WiFi.onEvent(WiFiGotIP, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP);
     WiFi.setAutoReconnect(true);
     WiFi.begin(ssid, password);
+    ESP_LOGI("INITIALIZE WIFI", "Try Connecting to %s\n", ssid);
     while (WiFi.status() != WL_CONNECTED)
     {
         delay(1000);

@@ -48,6 +48,8 @@ String MyLora::onReceive()
     if (recipient != _localAddress)
     {
         Serial.println(F("This Message is Not For Me!"));
+        Serial.print(F("This Message For "));
+        Serial.println(recipient, HEX);
         return "";
     }
     // read packet
