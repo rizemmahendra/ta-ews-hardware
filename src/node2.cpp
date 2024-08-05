@@ -35,6 +35,9 @@ MySensor *mySensor = new MySensor();
 // ================== ArduinoJSON Library & Config ==================
 #include <ArduinoJson.h>
 // =================================================================
+static uint64_t current;
+static uint64_t prevGetRainGauge = 0;
+static uint64_t prevSend = 0;
 
 void handleReedIntterupt()
 {
@@ -70,21 +73,20 @@ void loop()
     mySensor->getValueTurbdity(ldr);
     mySensor->getValueRainGauge(reedSwitch);
 
-    static uint64_t prevGetRainGauge = 0;
-    if (millis() - prevGetRainGauge >= 60000) // reset tick count every 1menit
+    current = millis();
+    if (current - prevGetRainGauge >= 60000) // reset tick count every 1menit
     {
         mySensor->resetTickCount();
-        prevGetRainGauge = millis();
+        prevGetRainGauge = current;
     }
 
-    static uint64_t prevSend = 0;
-    if (millis() - prevSend > interval && message != "")
+    if (current - prevSend > interval && message != "")
     {
         Serial.println(message);
-        StaticJsonDocument<128> dataFromNode1;
+        JsonDocument dataFromNode1;
         deserializeJson(dataFromNode1, message);
 
-        StaticJsonDocument<256> data;
+        JsonDocument data;
         data["node1"] = dataFromNode1.as<JsonObject>();
         data["node2"]["w"] = ultrasonik->value;
         data["node2"]["ws"] = ultrasonik->status;
@@ -98,6 +100,8 @@ void loop()
 
         unsigned long prev2 = millis();
         myLora->sendMessage(destination, message);
+        prevSend = current;
+
         Serial.print(F("lama mengirimkan data : "));
         Serial.println(millis() - prev2, DEC);
         Serial.println("mengirim data : " + message);
