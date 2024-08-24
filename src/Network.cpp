@@ -1,3 +1,4 @@
+#define CONFIG_ARDUHAL_LOG_COLORS 1
 #include <Arduino.h>
 #include <Network.h>
 #include <Firebase_ESP_Client.h>
@@ -99,7 +100,7 @@ void Network::getCurrentTime(Waktu *waktu)
         return;
     }
     strftime(waktu->date, sizeof(waktu->date), "%Y-%m-%d", &info);
-    strftime(waktu->time, sizeof(waktu->time), "%H:%M", &info);
+    strftime(waktu->time, sizeof(waktu->time), "%H:%M:%s", &info);
     strftime(waktu->hour, sizeof(waktu->hour), "%H", &info);
 }
 
@@ -125,10 +126,10 @@ bool Network::updateDataRealtimeFirebase(FirebaseJson *json, const char *updateM
 
     // Serial.print("Update a document... ");
 
-    ESP_LOGW("SEND NOTIFICATION", "Update Data Realtime...");
+    ESP_LOGW("UPDATE REALTIME", "Update Data Realtime...");
     if (Firebase.Firestore.patchDocument(&_fbdo, _projectId, "", documentPath.c_str(), json->raw(), updateMask))
     {
-        Serial.printf("Ok\n%s\n\n", _fbdo.payload().c_str());
+        // Serial.printf("\n%s\n\n", _fbdo.payload().c_str());
         return true;
     }
 
@@ -142,17 +143,19 @@ bool Network::updateDataRealtimeFirebase(FirebaseJson *json, const char *updateM
  * @param tanggal Tanggal yyyy-mm-dd
  * @param jam Jam hh:mm
  */
-void Network::updateDataHistoryFirebase(FirebaseJson *json, const char *tanggal, const char *jam)
+void Network::updateDataHistoryFirebase(FirebaseJson *json)
 {
-    String documentPath = "TA%20EWS%20RIZEM%20MAHENDRA/" + String(_idSungai) + "/data_sensor/history/" + String(tanggal) + "/" + String(jam);
+    String documentPath = "TA%20EWS%20RIZEM%20MAHENDRA/" + String(_idSungai) + "/data_sensor/history/list/";
 
-    Serial.println("Create a document ... ");
+    ESP_LOGW("UPDATE HISTORY", "Create a document history ... ");
     if (Firebase.Firestore.createDocument(&_fbdo, _projectId, "", documentPath.c_str(), json->raw()))
     {
+        ESP_LOGI("UPDATE HISTORY", "Success Create a document history");
         Serial.printf("ok\n%s\n\n", _fbdo.payload().c_str());
     }
     else
     {
+        ESP_LOGE("UPDATE HISTORY", "Failed Create a document history");
         Serial.println(_fbdo.errorReason());
     }
 }
@@ -179,7 +182,7 @@ void Network::sendNotification(const char *title, const char *body, const char *
     }
     else
     {
-        ESP_LOGI("SEND NOTIFICATION", "Send Notification Failed");
+        ESP_LOGE("SEND NOTIFICATION", "Send Notification Failed");
         Serial.println(_fbdo.errorReason());
     }
 }

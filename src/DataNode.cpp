@@ -20,6 +20,8 @@ public:
     DataNode(const char *name);
     void determineLevel();
     void toJson(FirebaseJson *json);
+    void toJsonHistory(FirebaseJson *json, String datetime);
+    String payloadNotification();
 };
 
 DataNode::DataNode(const char *nodeName)
@@ -73,6 +75,28 @@ void DataNode::toJson(FirebaseJson *json)
     json->set("fields/" + name + "/mapValue/fields/waterTurbidityStatus/stringValue", turbidityStatus);
     json->set("fields/" + name + "/mapValue/fields/rainIntensity/doubleValue", rainValue);
     json->set("fields/" + name + "/mapValue/fields/rainIntensityStatus/stringValue", rainStatus);
+}
+
+void DataNode::toJsonHistory(FirebaseJson *json, String datetime)
+{
+    json->set("fields/node/stringValue", name);
+    json->set("fields/datetime/stringValue", datetime);
+    json->set("fields/levelDanger/stringValue", levelDanger);
+    json->set("fields/waterLevel/doubleValue", waterValue);
+    json->set("fields/waterLevelStatus/stringValue", waterStatus);
+    json->set("fields/waterTurbidity/doubleValue", turbidityValue);
+    json->set("fields/waterTurbidityStatus/stringValue", turbidityStatus);
+    json->set("fields/rainIntensity/doubleValue", rainValue);
+    json->set("fields/rainIntensityStatus/stringValue", rainStatus);
+}
+
+String DataNode::payloadNotification()
+{
+    String payload = "";
+    payload = "Water Level : " + String(waterValue) + " CM [" + waterStatus + "]\n";
+    payload += "Turbidity : " + String(turbidityValue) + " NTU [" + turbidityStatus + "]\n";
+    payload += "Rain Intensity : " + String(rainValue) + " mm/hr [" + rainStatus + "]";
+    return payload;
 }
 
 bool DataNode::checkKenaikanAir()

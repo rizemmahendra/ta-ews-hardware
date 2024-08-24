@@ -26,7 +26,7 @@ public:
     void initializeTime(long gmtOffset_sec, int daylightOffset_sec, const char *urlNTPServer);
     void getCurrentTime(Waktu *waktu);
     bool updateDataRealtimeFirebase(FirebaseJson *json, const char *updateMask);
-    void updateDataHistoryFirebase(FirebaseJson *json, const char *tanggal, const char *jam);
+    void updateDataHistoryFirebase(FirebaseJson *json);
     void sendNotification(const char *title, const char *body, const char *channelId);
     bool ready();
 };

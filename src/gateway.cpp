@@ -19,7 +19,7 @@ MyLora *myLora = new MyLora(&nssPin, &resetPin, &dio0Pin, &localAddress);
 uint8_t buzzerPin = 4;
 
 Network *connection = new Network();
-// Waktu *waktu = new Waktu();
+Waktu *waktu = new Waktu();
 
 #include <DataNode.cpp>
 DataNode *node1 = new DataNode("node1");
@@ -29,7 +29,8 @@ TaskHandle_t handleConnectWifi = NULL;
 TaskHandle_t handleReceiveLora = NULL;
 TaskHandle_t handleBuzzer = NULL;
 TaskHandle_t handleUpdateRealtime = NULL;
-TaskHandle_t handleHistoryAndNotification = NULL;
+TaskHandle_t handleSendNotification = NULL;
+TaskHandle_t handleUpdateHistory = NULL;
 TaskHandle_t handleDetermineLevel = NULL;
 
 SemaphoreHandle_t xHTTPaccess = NULL;
@@ -38,7 +39,7 @@ QueueHandle_t parseQueue;
 /**
  * Alur Task
  * 1. Receive Lora✔️ -> Parse Data✔️ -> Determine Level Danger✔️ -> Buzzer✔️ -> (2)
- * 2. Connect Wifi & Firebase✔️ |-> send Realtime every 5s
+ * 2. Connect Wifi & Firebase✔️ |-> send Realtime every 5s✔️
  *                              |-> send notif and history if danger
  */
 
@@ -46,9 +47,10 @@ void receiveLoraTask(void *pvParameter);
 void buzzerTask(void *pvParameter);
 void connectWifi(void *pvParameter);
 void determineLevelOfDanger(void *pvParameter);
-void historyAndNotificationTask(void *pvParameter);
+void sendNotificationTask(void *pvParameter);
 void updateDataRealtime(void *pvParameter);
 void parsingDataTask(void *pvParemeter);
+void updateHistory(void *pvParameter);
 
 enum level
 {
@@ -67,15 +69,38 @@ void setup()
     level levelDanger;
 
     // core 0 for RF app like BLE, and Wifi: use it for task have little execution time
-    xTaskCreatePinnedToCore(buzzerTask, "Buzzer Task", 2048, NULL, 1, &handleBuzzer, 0);                         // 2KB
-    xTaskCreatePinnedToCore(parsingDataTask, "Parsing Data", 5120, NULL, 3, NULL, 0);                            // 2KB
+    xTaskCreatePinnedToCore(parsingDataTask, "Parsing Data", 10240, NULL, 3, NULL, 0);                           // 2KB
     xTaskCreatePinnedToCore(determineLevelOfDanger, "Determine Level", 2048, NULL, 2, &handleDetermineLevel, 0); // 2KB
+    xTaskCreatePinnedToCore(buzzerTask, "Buzzer Task", 2048, NULL, 1, &handleBuzzer, 0);                         // 2KB
 
     // core 1 for other app
-    xTaskCreatePinnedToCore(receiveLoraTask, "Receive Lora", 2048, NULL, 4, &handleReceiveLora, 1);                                  // 2KB
-    xTaskCreatePinnedToCore(connectWifi, "Connect Wifi", 5120, NULL, 3, &handleConnectWifi, 1);                                      // 5KB
-    xTaskCreatePinnedToCore(historyAndNotificationTask, "History & Notification", 10240, NULL, 2, &handleHistoryAndNotification, 1); // 10KB
-    xTaskCreatePinnedToCore(updateDataRealtime, "Update Realtime", 10240, NULL, 1, &handleUpdateRealtime, 1);                        // 10KB
+    xTaskCreatePinnedToCore(receiveLoraTask, "Receive Lora", 2048, NULL, 5, &handleReceiveLora, 1);                      // 2KB
+    xTaskCreatePinnedToCore(connectWifi, "Connect Wifi", 10240, NULL, 4, &handleConnectWifi, 1);                         // 5KB
+    xTaskCreatePinnedToCore(sendNotificationTask, "History & Notification", 10240, NULL, 3, &handleSendNotification, 1); // 10KB
+    xTaskCreatePinnedToCore(updateDataRealtime, "Update Realtime", 10240, NULL, 1, &handleUpdateRealtime, 1);            // 10KB
+    xTaskCreatePinnedToCore(updateHistory, "Update History", 10240, NULL, 2, &handleUpdateHistory, 1);
+
+    // testing
+    vTaskDelay(15000 / portTICK_PERIOD_MS); // 10s
+    String message = "{\"node1\":{\"w\":14.9,\"ws\":\"L\",\"t\":977,\"ts\":\"CL\",\"r\":0,\"rs\":\"NR\"},\"node2\":{\"w\":15.29,\"ws\":\"H\",\"t\":986.8,\"ts\":\"CL\",\"r\":0,\"rs\":\"NR\"}}";
+    if (xQueueSend(parseQueue, &message, pdMS_TO_TICKS(100)) != pdPASS)
+    {
+        ESP_LOGE("TESTING", "Gagal Mengirim ke Queue Parse");
+    }
+    else
+    {
+        ESP_LOGI("TESTING", "Berhasil Mengirim ke Queue Parse");
+    }
+    // vTaskDelay(10000 / portTICK_PERIOD_MS);
+    // message = "{\"node1\":{\"w\":14.92,\"ws\":\"H\",\"t\":977,\"ts\":\"CL\",\"r\":0,\"rs\":\"NR\"},\"node2\":{\"w\":15.29,\"ws\":\"L\",\"t\":986.9,\"ts\":\"CL\",\"r\":0,\"rs\":\"NR\"}}";
+    // if (xQueueSend(parseQueue, &message, pdMS_TO_TICKS(100)) != pdPASS)
+    // {
+    //     ESP_LOGE("TESTING", "Gagal Mengirim ke Queue Parse");
+    // }
+    // else
+    // {
+    //     ESP_LOGI("TESTING", "Berhasil Mengirim ke Queue Parse");
+    // }
 }
 
 void loop() {}
@@ -105,28 +130,25 @@ void receiveLoraTask(void *pvParameter)
     }
 }
 // =================================================================================
-void setFloatData(FirebaseJson *json, FirebaseJsonData *data, float *var, const char *path)
+void setFloatData(FirebaseJson *json, FirebaseJsonData *data, float *var, const char *path, bool &error)
 {
     json->get(*data, path);
     if (!data->success)
     {
         ESP_LOGE("SET FLOAT", "Error get data %s", path);
-        return;
-    }
-    if (data->type == "int")
-    {
-        *var = data->to<float>();
+        error = true;
         return;
     }
 
     *var = data->floatValue;
 }
 
-void setStringData(FirebaseJson *json, FirebaseJsonData *data, String *var, const char *path)
+void setStringData(FirebaseJson *json, FirebaseJsonData *data, String *var, const char *path, bool &error)
 {
     json->get(*data, path);
     if (!data->success)
     {
+        error = true;
         ESP_LOGE("SET String", "Error get data %s", path);
         return;
     }
@@ -136,9 +158,10 @@ void setStringData(FirebaseJson *json, FirebaseJsonData *data, String *var, cons
 void parsingDataTask(void *pvParemeter)
 {
     Serial.println(F("Create Parsing Data Task"));
-    FirebaseJson *json = new FirebaseJson;
-    FirebaseJsonData *data = new FirebaseJsonData;
+    FirebaseJson *json = new FirebaseJson();
+    FirebaseJsonData *data = new FirebaseJsonData();
     String message;
+    bool errorWhenParse;
     while (true)
     {
         // ensures delay calls are not missed due to use of continue
@@ -146,31 +169,36 @@ void parsingDataTask(void *pvParemeter)
 
         if (xQueueReceive(parseQueue, &message, pdTICKS_TO_MS(100)) == pdPASS)
         {
-            Serial.println(message);
             if (!json->setJsonData(message))
             {
+                Serial.println(message);
                 ESP_LOGE("PARSING DATA", "Error parsing string to json");
                 continue;
             }
+            errorWhenParse = false;
             // set Data Node 1
-            setFloatData(json, data, &node1->waterValue, "node1/w");
-            setStringData(json, data, &node1->waterStatus, "node1/ws");
-            setFloatData(json, data, &node1->turbidityValue, "node1/t");
-            setStringData(json, data, &node1->turbidityStatus, "node1/ts");
-            setFloatData(json, data, &node1->rainValue, "node1/r");
-            setStringData(json, data, &node1->rainStatus, "node1/rs");
+            setFloatData(json, data, &node1->waterValue, "node1/w", errorWhenParse);
+            setStringData(json, data, &node1->waterStatus, "node1/ws", errorWhenParse);
+            setFloatData(json, data, &node1->turbidityValue, "node1/t", errorWhenParse);
+            setStringData(json, data, &node1->turbidityStatus, "node1/ts", errorWhenParse);
+            setFloatData(json, data, &node1->rainValue, "node1/r", errorWhenParse);
+            setStringData(json, data, &node1->rainStatus, "node1/rs", errorWhenParse);
 
             // set Data Node 2
-            setFloatData(json, data, &node2->waterValue, "node2/w");
-            setStringData(json, data, &node2->waterStatus, "node2/ws");
-            setFloatData(json, data, &node2->turbidityValue, "node2/t");
-            setStringData(json, data, &node2->turbidityStatus, "node2/ts");
-            setFloatData(json, data, &node2->rainValue, "node2/r");
-            setStringData(json, data, &node2->rainStatus, "node2/rs");
-            ESP_LOGI("PARSING DATA", "Parsing Data Done");
+            setFloatData(json, data, &node2->waterValue, "node2/w", errorWhenParse);
+            setStringData(json, data, &node2->waterStatus, "node2/ws", errorWhenParse);
+            setFloatData(json, data, &node2->turbidityValue, "node2/t", errorWhenParse);
+            setStringData(json, data, &node2->turbidityStatus, "node2/ts", errorWhenParse);
+            setFloatData(json, data, &node2->rainValue, "node2/r", errorWhenParse);
+            setStringData(json, data, &node2->rainStatus, "node2/rs", errorWhenParse);
 
-            // Notify to Determine Level Task that data ready
-            xTaskNotify(handleDetermineLevel, 1, eNoAction);
+            if (!errorWhenParse)
+            {
+                ESP_LOGI("PARSING DATA", "Parsing Data Done");
+
+                // Notify to Determine Level Task that data ready
+                xTaskNotify(handleDetermineLevel, 1, eNoAction);
+            }
         }
     }
 }
@@ -208,9 +236,9 @@ void determineLevelOfDanger(void *pvParameter)
             }
 
             // Notify to Notification & History Task Level Danger has Determine
-            if (eTaskGetState(handleHistoryAndNotification) != eSuspended && (levelDanger != AMAN))
+            if (eTaskGetState(handleSendNotification) != eSuspended && (levelDanger != AMAN))
             {
-                xTaskNotify(handleHistoryAndNotification, 1, eNoAction);
+                xTaskNotify(handleSendNotification, 1, eNoAction);
             }
 
             // Notify to Buzzer Task Level Danger has Determine
@@ -226,6 +254,7 @@ void buzzerTask(void *pvParameter)
     pinMode(buzzerPin, OUTPUT);
     bool buzzerState = 0;
     digitalWrite(buzzerPin, buzzerState);
+    level prevLevel = AMAN;
     uint16_t buzzerOn = 1000;
     uint16_t interval;
     uint32_t levelDanger;
@@ -235,21 +264,24 @@ void buzzerTask(void *pvParameter)
     {
         if (xTaskNotifyWait(0x00, ULONG_MAX, &levelDanger, pdMS_TO_TICKS(100)) == pdPASS)
         {
-            switch ((level)levelDanger)
+            if ((level)levelDanger != prevLevel)
             {
-            case BAHAYA:
-                interval = 1000;
-                buzzerState = 1;
-                digitalWrite(buzzerPin, buzzerState);
-                break;
-            case WASPADA:
-                interval = 5000;
-                buzzerState = 1;
-                digitalWrite(buzzerPin, buzzerState);
-                break;
-            default:
-                interval = 0;
-                break;
+                switch ((level)levelDanger)
+                {
+                case BAHAYA:
+                    interval = 1000;
+                    buzzerState = 1;
+                    digitalWrite(buzzerPin, buzzerState);
+                    break;
+                case WASPADA:
+                    interval = 5000;
+                    buzzerState = 1;
+                    digitalWrite(buzzerPin, buzzerState);
+                    break;
+                default:
+                    interval = 0;
+                    break;
+                }
             }
         }
 
@@ -287,16 +319,20 @@ void buzzerTask(void *pvParameter)
 // =================================================================================
 void suspendTask()
 {
-    vTaskSuspend(handleHistoryAndNotification);
-    ESP_LOGI("CONNECT WIFI", "Suspend Notification & History Task");
+    vTaskSuspend(handleSendNotification);
+    ESP_LOGI("CONNECT WIFI", "Suspend Send Notification Task");
+    vTaskSuspend(handleUpdateHistory);
+    ESP_LOGI("CONNECT WIFI", "Suspend Update History Task");
     vTaskSuspend(handleUpdateRealtime);
     ESP_LOGI("CONNECT WIFI", "Suspend Update Realtime Task");
 }
 
 void resumeTask()
 {
-    vTaskResume(handleHistoryAndNotification);
-    ESP_LOGI("CONNECT WIFI", "Resume Notification & History Task");
+    vTaskResume(handleSendNotification);
+    ESP_LOGI("CONNECT WIFI", "Resume Send Notification Task");
+    vTaskResume(handleUpdateHistory);
+    ESP_LOGI("CONNECT WIFI", "Resume Update History Task");
     vTaskResume(handleUpdateRealtime);
     ESP_LOGI("CONNECT WIFI", "Resume Update Realtime Task");
 }
@@ -308,7 +344,7 @@ void connectWifi(void *pvParameter)
     {
         if (WiFi.status() != WL_CONNECTED)
         {
-            if (eTaskGetState(handleUpdateRealtime) != eSuspended || eTaskGetState(handleHistoryAndNotification) != eSuspended)
+            if (eTaskGetState(handleUpdateRealtime) != eSuspended || eTaskGetState(handleSendNotification) != eSuspended || eTaskGetState(handleUpdateHistory) != eSuspended)
             {
                 suspendTask();
             }
@@ -319,7 +355,7 @@ void connectWifi(void *pvParameter)
                 connection->initializeFirebase(API_KEY, FIREBASE_PROJECT_ID, USER_EMAIL, USER_PASSWORD, ID_SUNGAI, CLIENT_EMAIL, PRIVATE_KEY);
                 ESP_LOGI("CONNECT_WIFI", "Succcess connected to Wifi, Syncronize Time and Connected to Firebase");
 
-                if (eTaskGetState(handleUpdateRealtime) == eSuspended || eTaskGetState(handleHistoryAndNotification) == eSuspended)
+                if (eTaskGetState(handleUpdateRealtime) == eSuspended || eTaskGetState(handleSendNotification) == eSuspended || eTaskGetState(handleUpdateHistory) == eSuspended)
                 {
                     if (connection->ready())
                     {
@@ -330,7 +366,7 @@ void connectWifi(void *pvParameter)
         }
         else if (WiFi.status() == WL_CONNECTED)
         {
-            if (eTaskGetState(handleUpdateRealtime) == eSuspended || eTaskGetState(handleHistoryAndNotification) == eSuspended)
+            if (eTaskGetState(handleUpdateRealtime) == eSuspended || eTaskGetState(handleSendNotification) == eSuspended || eTaskGetState(handleUpdateHistory) == eSuspended)
             {
                 if (connection->ready())
                 {
@@ -351,7 +387,7 @@ void updateDataRealtime(void *pvParameter)
     uint64_t prevSend = 0;
     uint64_t current = millis();
     String updateMask;
-    FirebaseJson content;
+    FirebaseJson *content = new FirebaseJson();
     while (true)
     {
         if (xTaskNotifyWait(0x00, 0x00, &ulNotificationValue, pdMS_TO_TICKS(100)) == pdPASS)
@@ -368,14 +404,14 @@ void updateDataRealtime(void *pvParameter)
                 {
                     updateMask = "";
                     // Node 1
-                    node1->toJson(&content);
+                    node1->toJson(content);
                     updateMask += "node1.levelDanger, node1.waterLevel, node1.waterLevelStatus, node1.waterTurbidity, node1.waterTurbidityStatus, node1.rainIntensity, node1.rainIntensityStatus,";
 
                     // Node 2
-                    node2->toJson(&content);
+                    node2->toJson(content);
                     updateMask += "node2.levelDanger, node2.waterLevel, node2.waterLevelStatus, node2.waterTurbidity, node2.waterTurbidityStatus, node2.rainIntensity, node2.rainIntensityStatus,";
 
-                    if (connection->updateDataRealtimeFirebase(&content, updateMask.c_str()))
+                    if (connection->updateDataRealtimeFirebase(content, updateMask.c_str()))
                     {
                         ESP_LOGI("UPDATE REALTIME", "Success Update Realtime");
                         newData = false;
@@ -398,14 +434,12 @@ void updateDataRealtime(void *pvParameter)
 }
 // =================================================================================
 
-void historyAndNotificationTask(void *pvParameter)
+void sendNotificationTask(void *pvParameter)
 {
     Serial.println(F("Create Send Notification Task"));
     uint32_t ulNotificationValue;
-    String prevLevelNode1 = "aman";
-    String prevLevelNode2 = "aman";
-    String titleNotification = "";
-    String bodyNotification = "";
+    String prevLevelNode1 = "Aman";
+    String prevLevelNode2 = "Aman";
     String channelIdNotification = "";
     while (true)
     {
@@ -415,30 +449,30 @@ void historyAndNotificationTask(void *pvParameter)
             {
                 if (connection->ready())
                 {
-                    ESP_LOGI("NOTIFICATION & HISTORY", "Send Notification");
                     // Bahaya Node 1
                     if (node1->levelDanger == "Waspada" && prevLevelNode1 != "Waspada")
                     {
-                        // connection->sendHistory();
-                        connection->sendNotification("Waspada", "Node 1 Dalam Keadaan Waspada", "danger_notification");
+                        connection->sendNotification("Node 1 Dalam Keadaan Waspada", node1->payloadNotification().c_str(), "danger_notification");
                     }
                     else if (node1->levelDanger == "Siaga" && prevLevelNode1 != "Siaga")
                     {
-                        // connection->sendHistory();
-                        connection->sendNotification("Siaga", "Node 1 Dalam Keadaan Waspada", "alert_notification");
+                        connection->sendNotification("Node 1 Dalam Keadaan Siaga", node1->payloadNotification().c_str(), "alert_notification");
                     }
+                    prevLevelNode1 = node1->levelDanger;
 
                     // Bahaya Node 2
                     if (node2->levelDanger == "Waspada" && prevLevelNode2 != "Waspada")
                     {
                         // connection->sendHistory();
-                        connection->sendNotification("Waspada", "Node 2 Dalam Keadaan Waspada", "danger_notification");
+                        connection->sendNotification("Node 2 Dalam Keadaan Waspada", node2->payloadNotification().c_str(), "danger_notification");
                     }
                     else if (node2->levelDanger == "Siaga" && prevLevelNode2 != "Siaga")
                     {
                         // connection->sendHistory();
-                        connection->sendNotification("Siaga", "Node 2 Dalam Keadaan Waspada", "alert_notification");
+                        connection->sendNotification("Node 2 Dalam Keadaan Siaga", node2->payloadNotification().c_str(), "alert_notification");
                     }
+                    prevLevelNode2 = node2->levelDanger;
+                    xTaskNotify(handleUpdateHistory, 1, eNoAction);
                 }
                 xSemaphoreGive(xHTTPaccess);
             }
@@ -447,3 +481,50 @@ void historyAndNotificationTask(void *pvParameter)
     }
 }
 // =================================================================================
+void updateHistory(void *pvParameter)
+{
+    Serial.println(F("Create Update History Task"));
+    uint32_t ulNotificationValue;
+    String prevLevelNode1 = "Aman";
+    String prevLevelNode2 = "Aman";
+    FirebaseJson *jsonNode = new FirebaseJson();
+    while (true)
+    {
+        if (xTaskNotifyWait(0x00, 0x00, &ulNotificationValue, pdMS_TO_TICKS(100)) == pdPASS)
+        {
+            connection->getCurrentTime(waktu);
+            if (xSemaphoreTake(xHTTPaccess, portMAX_DELAY) == pdTRUE)
+            {
+                if (connection->ready())
+                {
+                    if (node1->levelDanger == "Waspada" && prevLevelNode1 != "Waspada")
+                    {
+                        node1->toJsonHistory(jsonNode, waktu->fullDateTime());
+                        connection->updateDataHistoryFirebase(jsonNode);
+                    }
+                    else if (node1->levelDanger == "Siaga" && prevLevelNode1 != "Siaga")
+                    {
+                        node1->toJsonHistory(jsonNode, waktu->fullDateTime());
+                        connection->updateDataHistoryFirebase(jsonNode);
+                    }
+                    prevLevelNode1 = node1->levelDanger;
+
+                    if (node2->levelDanger == "Waspada" && prevLevelNode2 != "Waspada")
+                    {
+                        node2->toJsonHistory(jsonNode, waktu->fullDateTime());
+                        connection->updateDataHistoryFirebase(jsonNode);
+                    }
+                    else if (node2->levelDanger == "Siaga" && prevLevelNode2 != "Siaga")
+                    {
+                        node2->toJsonHistory(jsonNode, waktu->fullDateTime());
+                        connection->updateDataHistoryFirebase(jsonNode);
+                    }
+                    prevLevelNode2 = node2->levelDanger;
+                }
+                xSemaphoreGive(xHTTPaccess);
+            }
+        }
+        // Serial.println(uxTaskGetStackHighWaterMark(NULL));
+        vTaskDelay(100 / portTICK_PERIOD_MS); // 100ms
+    }
+}
