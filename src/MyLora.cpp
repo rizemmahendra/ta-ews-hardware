@@ -68,6 +68,8 @@ String MyLora::onReceive()
     Serial.println(sender, HEX);
     Serial.print(F("Rssi:"));
     Serial.println(LoRa.packetRssi());
+    Serial.print("Data Diterima : ");
+    Serial.println(incoming);
     return incoming;
 }
 

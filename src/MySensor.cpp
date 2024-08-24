@@ -32,6 +32,17 @@ void MySensor::setThresholdWaterLevel(uint8_t lowThreshold, uint8_t mediumThresh
     MySensor::_waterLevelLowThreshold = lowThreshold;
     MySensor::_waterLevelMediumThreshold = mediumThreshold;
 }
+/**
+ * @brief Set Linear Regression for water level measurement, format y = ax + b
+ * @param a value a in linear regression formula
+ * @param b value b in linear regression formula
+ */
+void MySensor::setLinearRegressionWaterLevel(float a, float b)
+{
+    MySensor::_linearRegressionWaterLevel = true;
+    MySensor::_valueAWaterLevel = a;
+    MySensor::_valueBWaterLevel = b;
+}
 
 /**
  * @brief
@@ -90,9 +101,17 @@ void MySensor::getValueWaterLevel(DataSensor *sensor)
     digitalWrite(_trigPin, LOW);
 
     long duration = pulseIn(_echoPin, HIGH);
+    float distance = 0.0F;
     // float distance = duration / 58.2; //  58.2 is (speed of sound / 2) in cm/us;
-    float distance = (duration / 2) * 0.0343;
-    sensor->value = distance;
+    if (MySensor::_linearRegressionWaterLevel)
+    {
+        distance = (MySensor::_valueAWaterLevel * duration) + MySensor::_valueBWaterLevel;
+    }
+    else
+    {
+        distance = (duration / 2) * 0.0343;
+    }
+    sensor->value = (roundf(distance * 100)) / 100.0;
     /**
      * Tinggi Air : L (Low), M (Medium), H (High)
      */
@@ -122,7 +141,8 @@ void MySensor::getValueTurbdity(DataSensor *sensor)
         value += analogRead(_ldrPin);
     }
     value = value / 10;
-    sensor->value = value;
+    sensor->value = map(value, 1000, 600, 0, 100);
+
     /**
      * CL (Clear),M (Murky),T (Turbid)
      */

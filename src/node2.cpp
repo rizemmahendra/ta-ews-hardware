@@ -38,6 +38,7 @@ MySensor *mySensor = new MySensor();
 static uint64_t current;
 static uint64_t prevGetRainGauge = 0;
 static uint64_t prevSend = 0;
+static unsigned long prevSendLora = millis();
 
 void handleReedIntterupt()
 {
@@ -57,6 +58,7 @@ void setup()
 
     mySensor->initiliazeWaterLevel(trigPin, echoPin);
     mySensor->setThresholdWaterLevel(5, 7);
+    mySensor->setLinearRegressionWaterLevel(-0.0165, 14.874);
     mySensor->initiliazeTurbdidity(ldrPin);
     mySensor->setThresholdTurbidity(950, 800);
     mySensor->initiliazeRainGauge(reedSwitchPin, tickVolume, handleReedIntterupt);
@@ -82,11 +84,10 @@ void loop()
 
     if (current - prevSend > interval && message != "")
     {
-        Serial.println(message);
-        JsonDocument dataFromNode1;
+        StaticJsonDocument<126> dataFromNode1;
         deserializeJson(dataFromNode1, message);
 
-        JsonDocument data;
+        StaticJsonDocument<256> data;
         data["node1"] = dataFromNode1.as<JsonObject>();
         data["node2"]["w"] = ultrasonik->value;
         data["node2"]["ws"] = ultrasonik->status;
@@ -98,15 +99,16 @@ void loop()
         message = "";
         serializeJson(data, message);
 
-        unsigned long prev2 = millis();
-        myLora->sendMessage(destination, message);
-        prevSend = current;
-
-        Serial.print(F("lama mengirimkan data : "));
-        Serial.println(millis() - prev2, DEC);
+        prevSendLora = millis();
         Serial.println("mengirim data : " + message);
-        Serial.println(F("-----------------------------------------"));
+        myLora->sendMessage(destination, message);
+        Serial.print(F("lama mengirimkan data : "));
+        Serial.println(millis() - prevSendLora, DEC);
+
+        Serial.println(F(""));
         message = "";
+
+        prevSend = current;
         LoRa.receive();
     }
     delay(100);

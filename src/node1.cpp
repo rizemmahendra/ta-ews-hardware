@@ -38,15 +38,18 @@ MySensor *mySensor = new MySensor();
 static uint64_t current;
 static uint64_t prevGetRainGauge = 0;
 static uint64_t prevSend = 0;
+static unsigned long prevSendLora = 0;
 
 void handleReedIntterupt()
 {
     static unsigned long prevReed = 0;
+    static int count = 0;
     if (millis() - prevReed >= 50) // mencengah double increment akibat bouncing
     {
-        Serial.println(prevReed);
         mySensor->tickIncreament();
         Serial.println(F("Increment Tick"));
+        Serial.print("Tick : ");
+        Serial.println(++count);
         prevReed = millis();
     }
 }
@@ -56,7 +59,8 @@ void setup()
     Serial.begin(9600);
 
     mySensor->initiliazeWaterLevel(trigPin, echoPin);
-    mySensor->setThresholdWaterLevel(5, 7);
+    mySensor->setThresholdWaterLevel(4, 7);
+    mySensor->setLinearRegressionWaterLevel(-0.0169, 14.817);
     mySensor->initiliazeTurbdidity(ldrPin);
     mySensor->setThresholdTurbidity(950, 800);
     mySensor->initiliazeRainGauge(reedSwitchPin, tickVolume, handleReedIntterupt);
@@ -81,22 +85,22 @@ void loop()
     if (current - prevSend > interval || prevSend == 0)
     {
         prevSend = current;
-        JsonDocument data;
-        data["t"] = ultrasonik->value;
-        data["ts"] = ultrasonik->status;
-        data["k"] = ldr->value;
-        data["ks"] = ldr->status;
-        data["h"] = reedSwitch->value;
-        data["hs"] = reedSwitch->status;
+        StaticJsonDocument<126> data;
+        data["w"] = ultrasonik->value;
+        data["ws"] = ultrasonik->status;
+        data["t"] = ldr->value;
+        data["ts"] = ldr->status;
+        data["r"] = reedSwitch->value;
+        data["rs"] = reedSwitch->status;
 
         serializeJson(data, message);
 
-        // unsigned long prev2 = current;
+        prevSendLora = millis();
         myLora->sendMessage(destination, message);
         Serial.println("mengirim data : " + message);
-        // Serial.print("lama mengirimkan data : ");
-        // Serial.println(current - prev2, DEC);
-        Serial.println(F("-----------------------------------------"));
+        Serial.print("lama transmit data : ");
+        Serial.println(millis() - prevSendLora);
+        Serial.println(F(""));
         message = "";
     }
     delay(500);
