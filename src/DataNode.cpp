@@ -1,3 +1,4 @@
+#define CONFIG_ARDUHAL_LOG_COLORS 1
 #include <Arduino.h>
 #include <Firebase.h>
 
@@ -18,6 +19,10 @@ public:
     String levelDanger = "aman";
 
     DataNode(const char *name);
+    void explainWaterStatus();
+    void explainTurbidityStatus();
+    void explainRainStatus();
+    void printAllData();
     void determineLevel();
     void toJson(FirebaseJson *json);
     void toJsonHistory(FirebaseJson *json, String datetime);
@@ -27,6 +32,64 @@ public:
 DataNode::DataNode(const char *nodeName)
 {
     name = nodeName;
+}
+
+void DataNode::explainWaterStatus()
+{
+    if (waterStatus == "H")
+    {
+        waterStatus = "High";
+    }
+    else if (waterStatus == "M")
+    {
+        waterStatus = "Medium";
+    }
+    else if (waterStatus == "L")
+    {
+        waterStatus = "Low";
+    }
+    else
+    {
+        waterStatus = "Undefined";
+    }
+}
+void DataNode::explainTurbidityStatus()
+{
+    if (turbidityStatus == "T")
+    {
+        turbidityStatus = "Turbid";
+    }
+    else if (turbidityStatus == "M")
+    {
+        turbidityStatus = "Murky";
+    }
+    else if (turbidityStatus == "CL")
+    {
+        turbidityStatus = "Clear";
+    }
+    else
+    {
+        turbidityStatus = "Undefined";
+    }
+}
+void DataNode::explainRainStatus()
+{
+    if (rainStatus == "H")
+    {
+        rainStatus = "Heavy";
+    }
+    else if (rainStatus == "M")
+    {
+        rainStatus = "Moderate";
+    }
+    else if (rainStatus == "L")
+    {
+        rainStatus = "Light";
+    }
+    else
+    {
+        rainStatus = "No Rain";
+    }
 }
 
 void DataNode::determineLevel()
@@ -39,30 +102,35 @@ void DataNode::determineLevel()
      * Hujan : NR (No Rain),L (Light), M (Moderate), H (Heavy)
      * level : S (Safe), A (Alert), D (Danger)
      */
-    if (waterStatus == "H")
+    explainWaterStatus();
+    explainTurbidityStatus();
+    explainRainStatus();
+
+    if (waterStatus == "High")
     {
-        levelDanger = "Waspada";
+        levelDanger = "Danger";
         return;
     }
 
-    if (rainStatus == "H" && checkKenaikanAir())
+    if (rainStatus == "Heavy" && checkKenaikanAir())
     {
-        levelDanger = "Waspada";
+        levelDanger = "Danger";
         return;
     }
 
-    if (waterStatus == "M" || turbidityStatus == "T" || rainStatus == "H")
+    if (waterStatus == "Medium" || turbidityStatus == "Turbid" || rainStatus == "Heavy")
     {
-        levelDanger = "Siaga";
+        levelDanger = "Alert";
         return;
     }
 
-    if (rainStatus == "M" && checkKenaikanAir())
+    if (rainStatus == "Medium" && checkKenaikanAir())
     {
-        levelDanger = "Siaga";
+        levelDanger = "Alert";
+        return;
     }
 
-    levelDanger = "Aman";
+    levelDanger = "Safe";
     return;
 }
 
@@ -94,7 +162,7 @@ String DataNode::payloadNotification()
 {
     String payload = "";
     payload = "Water Level : " + String(waterValue) + " CM [" + waterStatus + "]\n";
-    payload += "Turbidity : " + String(turbidityValue) + " NTU [" + turbidityStatus + "]\n";
+    payload += "Turbidity : " + String(turbidityValue) + " ADC [" + turbidityStatus + "]\n";
     payload += "Rain Intensity : " + String(rainValue) + " mm/hr [" + rainStatus + "]";
     return payload;
 }
@@ -102,14 +170,29 @@ String DataNode::payloadNotification()
 bool DataNode::checkKenaikanAir()
 {
     static uint64_t prev = 0;
-    if (millis() - prev > 120000) // every 2m
+    if (millis() - prev > 120000 || prev == 0) // every 2m
     {
         prevWaterValue = waterValue;
         prev = millis();
     }
     if (waterValue - prevWaterValue > 1)
     {
+        // Serial.printf("Hujan pada %s menyebakan air naik", name);
+        ESP_LOGW("KENAIKAN AIR", "Hujan pada %s menyebakan air naik", name);
+        prevWaterValue = waterValue;
         return true;
     }
     return false;
+}
+
+void DataNode::printAllData()
+{
+    Serial.printf("== Data %s ==\n", name);
+    Serial.printf("levelDanger : %s\n", levelDanger);
+    Serial.printf("waterLevel : %.2f\n", waterValue);
+    Serial.printf("waterLevelStatus : %s\n", waterStatus);
+    Serial.printf("waterTurbidity : %.2f\n", turbidityValue);
+    Serial.printf("waterTurbidityStatus : %s\n", turbidityStatus);
+    Serial.printf("rainIntensity : %.2f\n", rainValue);
+    Serial.printf("rainIntensityStatus : %s\n", rainStatus);
 }

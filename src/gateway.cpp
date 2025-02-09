@@ -54,9 +54,9 @@ void updateHistory(void *pvParameter);
 
 enum level
 {
-    AMAN,
-    WASPADA,
-    BAHAYA
+    SAFE,
+    ALERT,
+    DANGER
 };
 
 void setup()
@@ -69,38 +69,16 @@ void setup()
     level levelDanger;
 
     // core 0 for RF app like BLE, and Wifi: use it for task have little execution time
-    xTaskCreatePinnedToCore(parsingDataTask, "Parsing Data", 10240, NULL, 3, NULL, 0);                           // 2KB
+    xTaskCreatePinnedToCore(parsingDataTask, "Parsing Data", 10240, NULL, 3, NULL, 0);                           // 10KB
     xTaskCreatePinnedToCore(determineLevelOfDanger, "Determine Level", 2048, NULL, 2, &handleDetermineLevel, 0); // 2KB
     xTaskCreatePinnedToCore(buzzerTask, "Buzzer Task", 2048, NULL, 1, &handleBuzzer, 0);                         // 2KB
 
     // core 1 for other app
     xTaskCreatePinnedToCore(receiveLoraTask, "Receive Lora", 2048, NULL, 5, &handleReceiveLora, 1);                      // 2KB
-    xTaskCreatePinnedToCore(connectWifi, "Connect Wifi", 10240, NULL, 4, &handleConnectWifi, 1);                         // 5KB
-    xTaskCreatePinnedToCore(sendNotificationTask, "History & Notification", 10240, NULL, 3, &handleSendNotification, 1); // 10KB
+    xTaskCreatePinnedToCore(connectWifi, "Connect Wifi", 10240, NULL, 4, &handleConnectWifi, 1);                         // 10KB
+    xTaskCreatePinnedToCore(sendNotificationTask, "History & Notification", 10752, NULL, 5, &handleSendNotification, 1); // 15KB
     xTaskCreatePinnedToCore(updateDataRealtime, "Update Realtime", 10240, NULL, 1, &handleUpdateRealtime, 1);            // 10KB
     xTaskCreatePinnedToCore(updateHistory, "Update History", 10240, NULL, 2, &handleUpdateHistory, 1);
-
-    // testing
-    vTaskDelay(15000 / portTICK_PERIOD_MS); // 10s
-    String message = "{\"node1\":{\"w\":14.9,\"ws\":\"L\",\"t\":977,\"ts\":\"CL\",\"r\":0,\"rs\":\"NR\"},\"node2\":{\"w\":15.29,\"ws\":\"H\",\"t\":986.8,\"ts\":\"CL\",\"r\":0,\"rs\":\"NR\"}}";
-    if (xQueueSend(parseQueue, &message, pdMS_TO_TICKS(100)) != pdPASS)
-    {
-        ESP_LOGE("TESTING", "Gagal Mengirim ke Queue Parse");
-    }
-    else
-    {
-        ESP_LOGI("TESTING", "Berhasil Mengirim ke Queue Parse");
-    }
-    // vTaskDelay(10000 / portTICK_PERIOD_MS);
-    // message = "{\"node1\":{\"w\":14.92,\"ws\":\"H\",\"t\":977,\"ts\":\"CL\",\"r\":0,\"rs\":\"NR\"},\"node2\":{\"w\":15.29,\"ws\":\"L\",\"t\":986.9,\"ts\":\"CL\",\"r\":0,\"rs\":\"NR\"}}";
-    // if (xQueueSend(parseQueue, &message, pdMS_TO_TICKS(100)) != pdPASS)
-    // {
-    //     ESP_LOGE("TESTING", "Gagal Mengirim ke Queue Parse");
-    // }
-    // else
-    // {
-    //     ESP_LOGI("TESTING", "Berhasil Mengirim ke Queue Parse");
-    // }
 }
 
 void loop() {}
@@ -116,7 +94,7 @@ void receiveLoraTask(void *pvParameter)
         message = myLora->onReceive();
         if (message != "")
         {
-            // Serial.println(message);
+            // Serial.println();
             if (xQueueSend(parseQueue, &message, pdMS_TO_TICKS(100)) != pdPASS)
             {
                 ESP_LOGE("RECEIVE LORA", "Gagal Mengirim ke Queue Parse");
@@ -215,19 +193,43 @@ void determineLevelOfDanger(void *pvParameter)
             node1->determineLevel();
             node2->determineLevel();
 
-            if (node1->levelDanger == "Waspada" || node2->levelDanger == "Waspada")
+            node1->printAllData();
+            node2->printAllData();
+
+            if (node1->levelDanger == "Danger" || node2->levelDanger == "Danger")
             {
-                levelDanger = BAHAYA;
+                levelDanger = DANGER;
             }
-            else if (node1->levelDanger == "Siaga" || node2->levelDanger == "Siaga")
+            else if (node1->levelDanger == "Alert" || node2->levelDanger == "Alert")
             {
-                levelDanger = WASPADA;
+                levelDanger = ALERT;
             }
             else
             {
-                levelDanger = AMAN;
+                levelDanger = SAFE;
             }
-            ESP_LOGI("DETEMINE LEVEL", "Determine Level Done with value %d", levelDanger);
+            // ESP_LOGI("DETEMINE LEVEL", "Determine Level Done with value %d", levelDanger);
+            if (levelDanger == DANGER)
+            {
+                ESP_LOGW("DETEMINE LEVEL", "Determine Level Done : Level is Danger");
+                ESP_LOGW("BUZZER", "Buzzer On Interval 1s");
+            }
+            else if (levelDanger == ALERT)
+            {
+                ESP_LOGW("DETEMINE LEVEL", "Determine Level Done : Level is Alert");
+                ESP_LOGW("BUZZER", "Buzzer On Interval 5s");
+            }
+            else
+            {
+                ESP_LOGW("DETEMINE LEVEL", "Determine Level Done : Level is Safe");
+                ESP_LOGW("BUZZER", "Buzzer Off");
+            }
+
+            // Notify to Notification & History Task Level Danger has Determine
+            if (eTaskGetState(handleSendNotification) != eSuspended && (levelDanger != SAFE))
+            {
+                xTaskNotify(handleSendNotification, 1, eNoAction);
+            }
 
             // Notify to Update Realtime Task Level Danger has Determine
             if (eTaskGetState(handleUpdateRealtime) != eSuspended)
@@ -235,13 +237,7 @@ void determineLevelOfDanger(void *pvParameter)
                 xTaskNotify(handleUpdateRealtime, 1, eNoAction);
             }
 
-            // Notify to Notification & History Task Level Danger has Determine
-            if (eTaskGetState(handleSendNotification) != eSuspended && (levelDanger != AMAN))
-            {
-                xTaskNotify(handleSendNotification, 1, eNoAction);
-            }
-
-            // Notify to Buzzer Task Level Danger has Determine
+            // // Notify to Buzzer Task Level Danger has Determine
             xTaskNotify(handleBuzzer, (uint32_t)levelDanger, eSetValueWithOverwrite);
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -254,7 +250,7 @@ void buzzerTask(void *pvParameter)
     pinMode(buzzerPin, OUTPUT);
     bool buzzerState = 0;
     digitalWrite(buzzerPin, buzzerState);
-    level prevLevel = AMAN;
+    level prevLevel = SAFE;
     uint16_t buzzerOn = 1000;
     uint16_t interval;
     uint32_t levelDanger;
@@ -266,20 +262,25 @@ void buzzerTask(void *pvParameter)
         {
             if ((level)levelDanger != prevLevel)
             {
+                prevLevel = (level)levelDanger;
                 switch ((level)levelDanger)
                 {
-                case BAHAYA:
+                case DANGER:
                     interval = 1000;
                     buzzerState = 1;
                     digitalWrite(buzzerPin, buzzerState);
                     break;
-                case WASPADA:
+                case ALERT:
                     interval = 5000;
                     buzzerState = 1;
                     digitalWrite(buzzerPin, buzzerState);
                     break;
-                default:
+                case SAFE:
                     interval = 0;
+                    buzzerState = 0;
+                    digitalWrite(buzzerPin, buzzerState);
+                    break;
+                default:
                     break;
                 }
             }
@@ -390,7 +391,7 @@ void updateDataRealtime(void *pvParameter)
     FirebaseJson *content = new FirebaseJson();
     while (true)
     {
-        if (xTaskNotifyWait(0x00, 0x00, &ulNotificationValue, pdMS_TO_TICKS(100)) == pdPASS)
+        if (xTaskNotifyWait(0x00, 0xFF, &ulNotificationValue, pdMS_TO_TICKS(100)) == pdPASS)
         {
             newData = true;
         }
@@ -438,35 +439,36 @@ void sendNotificationTask(void *pvParameter)
 {
     Serial.println(F("Create Send Notification Task"));
     uint32_t ulNotificationValue;
-    String prevLevelNode1 = "Aman";
-    String prevLevelNode2 = "Aman";
+    String prevLevelNode1 = "Safe";
+    String prevLevelNode2 = "Safe";
     String channelIdNotification = "";
     while (true)
     {
-        if (xTaskNotifyWait(0x00, 0x00, &ulNotificationValue, pdMS_TO_TICKS(100)) == pdPASS)
+        if (xTaskNotifyWait(0x00, 0xFF, &ulNotificationValue, pdMS_TO_TICKS(100)) == pdPASS)
         {
             if (xSemaphoreTake(xHTTPaccess, portMAX_DELAY) == pdTRUE)
             {
                 if (connection->ready())
                 {
+                    delay(100);
                     // Bahaya Node 1
-                    if (node1->levelDanger == "Waspada" && prevLevelNode1 != "Waspada")
+                    if (node1->levelDanger == "Danger" && prevLevelNode1 != "Danger")
                     {
                         connection->sendNotification("Node 1 Dalam Keadaan Waspada", node1->payloadNotification().c_str(), "danger_notification");
                     }
-                    else if (node1->levelDanger == "Siaga" && prevLevelNode1 != "Siaga")
+                    else if (node1->levelDanger == "Alert" && prevLevelNode1 != "Alert")
                     {
                         connection->sendNotification("Node 1 Dalam Keadaan Siaga", node1->payloadNotification().c_str(), "alert_notification");
                     }
                     prevLevelNode1 = node1->levelDanger;
 
                     // Bahaya Node 2
-                    if (node2->levelDanger == "Waspada" && prevLevelNode2 != "Waspada")
+                    if (node2->levelDanger == "Danger" && prevLevelNode2 != "Danger")
                     {
                         // connection->sendHistory();
                         connection->sendNotification("Node 2 Dalam Keadaan Waspada", node2->payloadNotification().c_str(), "danger_notification");
                     }
-                    else if (node2->levelDanger == "Siaga" && prevLevelNode2 != "Siaga")
+                    else if (node2->levelDanger == "Alert" && prevLevelNode2 != "Alert")
                     {
                         // connection->sendHistory();
                         connection->sendNotification("Node 2 Dalam Keadaan Siaga", node2->payloadNotification().c_str(), "alert_notification");
@@ -485,8 +487,8 @@ void updateHistory(void *pvParameter)
 {
     Serial.println(F("Create Update History Task"));
     uint32_t ulNotificationValue;
-    String prevLevelNode1 = "Aman";
-    String prevLevelNode2 = "Aman";
+    String prevLevelNode1 = "Safe";
+    String prevLevelNode2 = "Safe";
     FirebaseJson *jsonNode = new FirebaseJson();
     while (true)
     {
@@ -497,24 +499,24 @@ void updateHistory(void *pvParameter)
             {
                 if (connection->ready())
                 {
-                    if (node1->levelDanger == "Waspada" && prevLevelNode1 != "Waspada")
+                    if (node1->levelDanger == "Danger" && prevLevelNode1 != "Danger")
                     {
                         node1->toJsonHistory(jsonNode, waktu->fullDateTime());
                         connection->updateDataHistoryFirebase(jsonNode);
                     }
-                    else if (node1->levelDanger == "Siaga" && prevLevelNode1 != "Siaga")
+                    else if (node1->levelDanger == "Alert" && prevLevelNode1 != "Alert")
                     {
                         node1->toJsonHistory(jsonNode, waktu->fullDateTime());
                         connection->updateDataHistoryFirebase(jsonNode);
                     }
                     prevLevelNode1 = node1->levelDanger;
 
-                    if (node2->levelDanger == "Waspada" && prevLevelNode2 != "Waspada")
+                    if (node2->levelDanger == "Danger" && prevLevelNode2 != "Danger")
                     {
                         node2->toJsonHistory(jsonNode, waktu->fullDateTime());
                         connection->updateDataHistoryFirebase(jsonNode);
                     }
-                    else if (node2->levelDanger == "Siaga" && prevLevelNode2 != "Siaga")
+                    else if (node2->levelDanger == "Alert" && prevLevelNode2 != "Alert")
                     {
                         node2->toJsonHistory(jsonNode, waktu->fullDateTime());
                         connection->updateDataHistoryFirebase(jsonNode);

@@ -151,7 +151,7 @@ void Network::updateDataHistoryFirebase(FirebaseJson *json)
     if (Firebase.Firestore.createDocument(&_fbdo, _projectId, "", documentPath.c_str(), json->raw()))
     {
         ESP_LOGI("UPDATE HISTORY", "Success Create a document history");
-        Serial.printf("ok\n%s\n\n", _fbdo.payload().c_str());
+        // Serial.printf("ok\n%s\n\n", _fbdo.payload().c_str());
     }
     else
     {
@@ -171,14 +171,16 @@ void Network::sendNotification(const char *title, const char *body, const char *
 
     msg.topic = "ta_ews_rizemmahendra";
     msg.android.priority = "high";
+    msg.android.ttl = "600s";
     msg.data = payload.raw();
 
     // Serial.println("Send Message :  ");
     ESP_LOGW("SEND NOTIFICATION", "Send Notification...");
     if (Firebase.FCM.send(&_fbdo, &msg))
     {
+        // Firebase.FCM.payload(&_fbdo);
         ESP_LOGI("SEND NOTIFICATION", "Send Notification Successful");
-        // Serial.printf("Ok\n%s\n\n", _fbdo.payload());
+        Serial.printf("%s\n", Firebase.FCM.payload(&_fbdo));
     }
     else
     {
