@@ -52,6 +52,13 @@ String MyLora::onReceive()
         Serial.println(recipient, HEX);
         return "";
     }
+
+    Serial.println("");
+    Serial.print(F("From:"));
+    Serial.println(sender, HEX);
+    Serial.print(F("Rssi Packet :"));
+    Serial.println(LoRa.packetRssi());
+
     // read packet
     while (LoRa.available())
     {
@@ -63,11 +70,6 @@ String MyLora::onReceive()
         Serial.println(F("Message lenght does not match lenght"));
         return "";
     }
-    Serial.println("");
-    Serial.print(F("From:"));
-    Serial.println(sender, HEX);
-    Serial.print(F("Rssi:"));
-    Serial.println(LoRa.packetRssi());
     Serial.print("Data Diterima : ");
     Serial.println(incoming);
     return incoming;

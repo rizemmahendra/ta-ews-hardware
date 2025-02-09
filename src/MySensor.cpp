@@ -66,6 +66,22 @@ void MySensor::setThresholdTurbidity(uint16_t clearThreshold, uint16_t murkyThre
 }
 
 /**
+ * @brief Set Polynomial Regression for turbidity measurement, format y = ax^3 + bx^2 + cx + d
+ * @param a value a in polynomial regression formula
+ * @param b value b in polynomial regression formula
+ * @param c value c in polynomial regression formula
+ * @param d value d in polynomial regression formula
+ */
+void MySensor::setPolynomialRegressionTurbidity(float a, float b, float c, float d)
+{
+    MySensor::_polynomialRegressionTurbidity = true;
+    MySensor::_valueATurbidity = a;
+    MySensor::_valueBTurbidity = b;
+    MySensor::_valueCTurbidity = c;
+    MySensor::_valueDTurbidity = d;
+}
+
+/**
  * @brief
  * @param rainGaugePin
  */
@@ -112,6 +128,7 @@ void MySensor::getValueWaterLevel(DataSensor *sensor)
         distance = (duration / 2) * 0.0343;
     }
     sensor->value = (roundf(distance * 100)) / 100.0;
+    sensor->value = sensor->value < 0 ? 0 : sensor->value;
     /**
      * Tinggi Air : L (Low), M (Medium), H (High)
      */
@@ -141,7 +158,23 @@ void MySensor::getValueTurbdity(DataSensor *sensor)
         value += analogRead(_ldrPin);
     }
     value = value / 10;
-    sensor->value = map(value, 1000, 600, 0, 100);
+    // Serial.println();
+    // Serial.print("Nilai ADC : ");
+    // Serial.println(value);
+    // Serial.print("Nilai V : ");
+    // Serial.println((value / 1024) * 5);
+    // Serial.print("Nilai Keruh 1 : ");
+    // Serial.println(-733.297808903065 * value + 3345.169597143254);
+    // Serial.print("Nilai Keruh 2 : ");
+    // Serial.println(1000.00 - (((value / 1024) * 5) / 4.41) * 1000.00);
+    if (MySensor::_polynomialRegressionTurbidity)
+    {
+        sensor->value = MySensor::_valueATurbidity * pow(value, 3) + MySensor::_valueBTurbidity * pow(value, 2) + MySensor::_valueCTurbidity * value + MySensor::_valueDTurbidity;
+    }
+    else
+    {
+        sensor->value = value;
+    }
 
     /**
      * CL (Clear),M (Murky),T (Turbid)
@@ -193,6 +226,11 @@ void MySensor::getValueRainGauge(DataSensor *sensor)
         sensor->status = "H";
     }
 }
+uint8_t MySensor::getTickCount()
+{
+    return MySensor::_tickValue;
+}
+
 void MySensor::resetTickCount()
 {
     MySensor::_tickValue = 0;

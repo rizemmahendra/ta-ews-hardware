@@ -20,6 +20,11 @@ private:
     uint8_t _ldrPin;
     uint16_t _turbidityClearThreshold;
     uint16_t _turbidityMurkyThreshold;
+    bool _polynomialRegressionTurbidity = false;
+    float _valueATurbidity;
+    float _valueBTurbidity;
+    float _valueCTurbidity;
+    float _valueDTurbidity;
 
     // Rain Gauge or ReedSwitch
     uint8_t _reedSwitchPin;
@@ -37,6 +42,7 @@ public:
     void setLinearRegressionWaterLevel(float a, float b);
     void initiliazeTurbdidity(uint8_t turbidityPin);
     void setThresholdTurbidity(uint16_t clearThreshold, uint16_t murkyThreshold);
+    void setPolynomialRegressionTurbidity(float a, float b, float c, float d);
     void initiliazeRainGauge(uint8_t rainGaugePin, float tickVolume, void (*callback)(void));
     void setThresholdRainGauge(uint8_t lightThreshold, uint8_t moderateThreshold);
     void getValueWaterLevel(DataSensor *sensor);
@@ -44,6 +50,7 @@ public:
     void getValueRainGauge(DataSensor *sensor);
     void tickIncreament();
     void resetTickCount();
+    uint8_t getTickCount();
 };
 
 #endif
