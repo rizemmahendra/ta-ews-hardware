@@ -16,6 +16,7 @@ MyLora *myLora = new MyLora(&nssPin, &resetPin, &dio0Pin, &localAddress);
 // =================================================================
 #include <Network.h>
 #include <env.cpp>
+#include <time.h>
 uint8_t buzzerPin = 4;
 
 Network *connection = new Network();
@@ -352,9 +353,11 @@ void connectWifi(void *pvParameter)
 
             if (connection->initializeWifi(WIFI_SSID, WIFI_PASSWORD))
             {
-                connection->initializeTime(NTP_GMT_OFFSET_SEC, NTP_DAYLIGHT_OFFSET_SEC, NTP_SERVER);
                 connection->initializeFirebase(API_KEY, FIREBASE_PROJECT_ID, USER_EMAIL, USER_PASSWORD, ID_SUNGAI, CLIENT_EMAIL, PRIVATE_KEY);
+                connection->initializeTime(NTP_GMT_OFFSET_SEC, NTP_DAYLIGHT_OFFSET_SEC, NTP_SERVER);
                 ESP_LOGI("CONNECT_WIFI", "Succcess connected to Wifi, Syncronize Time and Connected to Firebase");
+                connection->getCurrentTime(waktu);
+                ESP_LOGI("CURRENT TIME", "DATETIME : %s", waktu->fullDateTime().c_str());
 
                 if (eTaskGetState(handleUpdateRealtime) == eSuspended || eTaskGetState(handleSendNotification) == eSuspended || eTaskGetState(handleUpdateHistory) == eSuspended)
                 {
@@ -454,11 +457,11 @@ void sendNotificationTask(void *pvParameter)
                     // Bahaya Node 1
                     if (node1->levelDanger == "Danger" && prevLevelNode1 != "Danger")
                     {
-                        connection->sendNotification("Node 1 Dalam Keadaan Waspada", node1->payloadNotification().c_str(), "danger_notification");
+                        connection->sendNotification("Node 1 is Alert", node1->payloadNotification().c_str(), "danger_notification");
                     }
                     else if (node1->levelDanger == "Alert" && prevLevelNode1 != "Alert")
                     {
-                        connection->sendNotification("Node 1 Dalam Keadaan Siaga", node1->payloadNotification().c_str(), "alert_notification");
+                        connection->sendNotification("Node 1 is Danger", node1->payloadNotification().c_str(), "alert_notification");
                     }
                     prevLevelNode1 = node1->levelDanger;
 
@@ -466,12 +469,12 @@ void sendNotificationTask(void *pvParameter)
                     if (node2->levelDanger == "Danger" && prevLevelNode2 != "Danger")
                     {
                         // connection->sendHistory();
-                        connection->sendNotification("Node 2 Dalam Keadaan Waspada", node2->payloadNotification().c_str(), "danger_notification");
+                        connection->sendNotification("Node 2 is Alert", node2->payloadNotification().c_str(), "danger_notification");
                     }
                     else if (node2->levelDanger == "Alert" && prevLevelNode2 != "Alert")
                     {
                         // connection->sendHistory();
-                        connection->sendNotification("Node 2 Dalam Keadaan Siaga", node2->payloadNotification().c_str(), "alert_notification");
+                        connection->sendNotification("Node 2 is Danger", node2->payloadNotification().c_str(), "alert_notification");
                     }
                     prevLevelNode2 = node2->levelDanger;
                     xTaskNotify(handleUpdateHistory, 1, eNoAction);

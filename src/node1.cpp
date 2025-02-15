@@ -65,7 +65,8 @@ void setup()
     mySensor->setThresholdWaterLevel(4, 7);
     mySensor->setLinearRegressionWaterLevel(-0.0169, 14.817);
     mySensor->initiliazeTurbdidity(ldrPin);
-    mySensor->setThresholdTurbidity(750, 550);
+    mySensor->setThresholdTurbidity(900, 870);
+    // mySensor->setThresholdTurbidity(750, 550);
     // mySensor->setPolynomialRegressionTurbidity(-0.0001, 0.2152, -156.92, 39269);
     mySensor->initiliazeRainGauge(reedSwitchPin, tickVolume, handleReedIntterupt);
     // mySensor->setThresholdRainGauge(20, 50);
