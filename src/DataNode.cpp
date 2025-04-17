@@ -179,7 +179,7 @@ bool DataNode::checkKenaikanAir()
     {
         // Serial.printf("Hujan pada %s menyebakan air naik", name);
         ESP_LOGW("KENAIKAN AIR", "Hujan pada %s menyebakan air naik", name);
-        prevWaterValue = waterValue;
+        // prevWaterValue = waterValue;
         return true;
     }
     return false;

@@ -227,9 +227,9 @@ void determineLevelOfDanger(void *pvParameter)
             }
 
             // Notify to Notification & History Task Level Danger has Determine
-            if (eTaskGetState(handleSendNotification) != eSuspended && (levelDanger != SAFE))
+            if (eTaskGetState(handleSendNotification) != eSuspended)
             {
-                xTaskNotify(handleSendNotification, 1, eNoAction);
+                xTaskNotify(handleSendNotification, (uint32_t)levelDanger, eSetValueWithOverwrite);
             }
 
             // Notify to Update Realtime Task Level Danger has Determine
@@ -457,11 +457,11 @@ void sendNotificationTask(void *pvParameter)
                     // Bahaya Node 1
                     if (node1->levelDanger == "Danger" && prevLevelNode1 != "Danger")
                     {
-                        connection->sendNotification("Node 1 is Alert", node1->payloadNotification().c_str(), "danger_notification");
+                        connection->sendNotification("Node 1 is Danger", node1->payloadNotification().c_str(), "danger_notification");
                     }
                     else if (node1->levelDanger == "Alert" && prevLevelNode1 != "Alert")
                     {
-                        connection->sendNotification("Node 1 is Danger", node1->payloadNotification().c_str(), "alert_notification");
+                        connection->sendNotification("Node 1 is Alert", node1->payloadNotification().c_str(), "alert_notification");
                     }
                     prevLevelNode1 = node1->levelDanger;
 
@@ -469,16 +469,18 @@ void sendNotificationTask(void *pvParameter)
                     if (node2->levelDanger == "Danger" && prevLevelNode2 != "Danger")
                     {
                         // connection->sendHistory();
-                        connection->sendNotification("Node 2 is Alert", node2->payloadNotification().c_str(), "danger_notification");
+                        connection->sendNotification("Node 2 is Danger", node2->payloadNotification().c_str(), "danger_notification");
                     }
                     else if (node2->levelDanger == "Alert" && prevLevelNode2 != "Alert")
                     {
                         // connection->sendHistory();
-                        connection->sendNotification("Node 2 is Danger", node2->payloadNotification().c_str(), "alert_notification");
+                        connection->sendNotification("Node 2 is Alert", node2->payloadNotification().c_str(), "alert_notification");
                     }
                     prevLevelNode2 = node2->levelDanger;
                     xTaskNotify(handleUpdateHistory, 1, eNoAction);
                 }
+                ESP_LOGE("CURRENT_NODE1", "Level Danger : %s", node1->levelDanger.c_str());
+                ESP_LOGE("CURRENT_NODE2", "Level Danger : %s", node2->levelDanger.c_str());
                 xSemaphoreGive(xHTTPaccess);
             }
         }
